@@ -26,7 +26,7 @@
     </tr>
     <tr>
       <td>Date</td>
-      <td>February 2026</td>
+      <td>February 21, 2026</td>
     </tr>
     <tr>
       <td>Status</td>
