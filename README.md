@@ -138,9 +138,7 @@ content-pulse/
 ---
 
 ## Documentation
-
-- [Business Requirement Specification](./docs/business-requirement-spec.md)
-- [Technical Design Document](./docs/technical-design-document.md)
+- [Wiki](https://github.com/mohamedvantrisai/content-pulse/wiki)
 
 ---
 
