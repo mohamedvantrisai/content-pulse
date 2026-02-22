@@ -1,0 +1,32 @@
+{
+  "name": "content-pulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cross-Platform Content Analytics Aggregator",
+  "workspaces": [
+    "packages/api",
+    "packages/dashboard"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=@contentpulse/api",
+    "dev:dashboard": "npm run dev --workspace=@contentpulse/dashboard",
+    "dev:all": "npm run dev --workspace=@contentpulse/api & npm run dev --workspace=@contentpulse/dashboard",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "eslint apps/",
+    "lint:fix": "eslint apps/ --fix",
+    "format": "prettier --write \"apps/**/*.{ts,tsx,json,css}\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,tsx,json,css}\"",
+    "seed": "npm run seed --workspace=@contentpulse/api"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "@eslint/js": "^9.21.0",
+    "eslint": "^9.21.0",
+    "typescript-eslint": "^8.25.0",
+    "prettier": "^3.5.3"
+  }
+}
