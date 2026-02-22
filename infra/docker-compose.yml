@@ -1,0 +1,42 @@
+# Content Pulse — Local Development Infrastructure
+# MongoDB 7 + Redis 7 for local development
+# Usage:
+#   Start:  docker compose -f infra/docker-compose.yml up -d
+#   Stop:   docker compose -f infra/docker-compose.yml down
+#   Reset:  docker compose -f infra/docker-compose.yml down --volumes
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: contentpulse-mongodb
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--eval', "db.runCommand({ ping: 1 }).ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: contentpulse-redis
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+# Named Volumes
+# mongo-data persists across `docker compose down`.
+# Use `docker compose down --volumes` to wipe all data.
+volumes:
+  mongo-data:
+    name: contentpulse-mongo-data
