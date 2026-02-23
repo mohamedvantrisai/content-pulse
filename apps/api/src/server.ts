@@ -1,16 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import pino from 'pino';
-
-const logger = pino({ level: process.env['LOG_LEVEL'] ?? 'info' });
-const PORT = Number(process.env['PORT']) || 4000;
+import { env, logger, connectDatabase, createRedisClient } from './config/index.js';
 
 function createApp(): express.Express {
   const app = express();
 
   app.use(helmet());
-  app.use(cors({ origin: process.env['CORS_ORIGINS'] ?? 'http://localhost:5173' }));
+  app.use(cors({ origin: env.CORS_ORIGINS }));
   app.use(express.json());
 
   app.get('/health', (_req, res) => {
@@ -20,10 +17,20 @@ function createApp(): express.Express {
   return app;
 }
 
-const app = createApp();
+async function bootstrap(): Promise<void> {
+  await connectDatabase();
+  createRedisClient();
 
-app.listen(PORT, () => {
-  logger.info(`Content Pulse API running on port ${PORT}`);
+  const app = createApp();
+
+  app.listen(env.PORT, () => {
+    logger.info({ port: env.PORT, env: env.NODE_ENV }, 'Content Pulse API started');
+  });
+}
+
+bootstrap().catch((error) => {
+  logger.fatal({ error }, 'Failed to start server');
+  process.exit(1);
 });
 
-export default app;
+export default createApp;
