@@ -75,6 +75,25 @@ npm run dev:all
 
 ---
 
+## Configuration
+
+Environment variables are validated at startup using [Zod](https://zod.dev). Missing required variables produce immediate, descriptive errors.
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `PORT` | No | `4000` | API server port |
+| `NODE_ENV` | No | `development` | `development` · `production` · `test` |
+| `MONGODB_URI` | **Yes** | — | MongoDB connection string |
+| `REDIS_URL` | No | `''` (disabled) | Redis URL. Empty = Redis features disabled gracefully |
+| `JWT_SECRET` | **Yes** | — | JWT signing secret (min 32 chars) |
+| `ENCRYPTION_KEY` | **Yes** | — | AES-256 key for token encryption (64-char hex) |
+| `LOG_LEVEL` | No | `info` | `fatal` · `error` · `warn` · `info` · `debug` · `trace` |
+| `CORS_ORIGINS` | No | `http://localhost:5173` | Allowed CORS origins |
+
+> **Note:** Redis is optional. If `REDIS_URL` is empty or Redis is unreachable, the API starts normally with caching/rate-limiting features disabled.
+
+---
+
 ## Available Scripts
 
 | Script | Description |
