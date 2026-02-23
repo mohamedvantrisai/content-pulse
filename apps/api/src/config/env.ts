@@ -1,5 +1,21 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
+import { resolve, dirname } from 'node:path';
+import { existsSync } from 'node:fs';
 import { z } from 'zod';
+
+/** Walks up from `startDir` to find the nearest `.env` file. */
+function findEnvFile(startDir: string): string | undefined {
+    let dir = startDir;
+    while (true) {
+        const candidate = resolve(dir, '.env');
+        if (existsSync(candidate)) return candidate;
+        const parent = dirname(dir);
+        if (parent === dir) return undefined;
+        dir = parent;
+    }
+}
+
+dotenv.config({ path: findEnvFile(process.cwd()) });
 
 const envSchema = z.object({
     PORT: z
