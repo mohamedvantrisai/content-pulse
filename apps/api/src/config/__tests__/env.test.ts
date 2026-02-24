@@ -3,6 +3,12 @@
  * TC-2: Verify env.ts throws descriptive error when required vars are missing.
  */
 
+// Mock dotenv so the actual .env file on disk is never loaded during tests.
+// This gives the test full control over process.env values.
+jest.mock('dotenv', () => ({
+    config: jest.fn(),
+}));
+
 describe('env', () => {
     const VALID_ENV = {
         NODE_ENV: 'test',
@@ -15,7 +21,7 @@ describe('env', () => {
         CORS_ORIGINS: 'http://localhost:5173',
     };
 
-    const originalEnv = process.env;
+    const originalEnv = { ...process.env };
 
     beforeEach(() => {
         jest.resetModules();

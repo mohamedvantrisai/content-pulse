@@ -144,6 +144,11 @@ docker compose -f infra/docker-compose.yml down --volumes
 content-pulse/
 ├── apps/
 │   ├── api/                # Express + Apollo backend
+│   │   └── src/
+│   │       ├── config/     # Env, database, redis, logger
+│   │       ├── models/     # Mongoose schemas + TypeScript interfaces
+│   │       ├── utils/      # Encryption, helpers
+│   │       └── server.ts   # Entry point
 │   └── dashboard/          # React + Vite frontend
 ├── docs/
 │   ├── business-requirement-spec.md
@@ -153,6 +158,23 @@ content-pulse/
 ├── package.json            # Root workspace config
 └── tsconfig.base.json      # Shared TypeScript config
 ```
+
+---
+
+## Data Models
+
+5 Mongoose models with TypeScript interfaces, validation, indexes, and encryption:
+
+| Model | Collection | Key Features |
+|-------|-----------|--------------|
+| **User** | `users` | Unique email, bcrypt password hashing, plan enum, embedded report preferences |
+| **Channel** | `channels` | AES-256-GCM encrypted OAuth tokens, compound unique index, sync status tracking |
+| **Post** | `posts` | Embedded metrics + history array, computed engagement rate, 4 query-optimised indexes |
+| **AnalyticsSnapshot** | `analyticssnapshots` | Daily/weekly/monthly rollups, idempotent upsert via compound unique index |
+| **ApiKey** | `apikeys` | bcrypt-hashed keys, prefix-based O(1) lookup, scope-based access control |
+
+All models export TypeScript interfaces from `@contentpulse/api/src/models/index.ts`.
+
 
 ---
 
