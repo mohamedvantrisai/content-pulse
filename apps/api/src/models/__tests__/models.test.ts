@@ -6,7 +6,7 @@
 import mongoose from 'mongoose';
 import { MongoMemoryServer } from 'mongodb-memory-server';
 
-// ─── Mock env BEFORE any model imports ───────────────────────
+// ─── Mock env BEFORE any model imports
 jest.mock('../../config/env.js', () => ({
     env: {
         ENCRYPTION_KEY:
@@ -36,7 +36,7 @@ import type {
     ApiKeyScope,
 } from '../index.js';
 
-// ─── Setup & Teardown ────────────────────────────────────────
+// ─── Setup & Teardown─────────────────
 
 let mongoServer: MongoMemoryServer;
 
@@ -55,7 +55,7 @@ afterEach(async () => {
     await Promise.all(collections.map((c) => c.deleteMany({})));
 });
 
-// ─── Helpers ─────────────────────────────────────────────────
+// ─── Helpers──────
 
 const userId = new mongoose.Types.ObjectId();
 const channelId = new mongoose.Types.ObjectId();
@@ -134,7 +134,7 @@ async function validApiKeyData(): Promise<Partial<IApiKey>> {
     };
 }
 
-// ─── TC-1: Valid document creation ───────────────────────────
+// ─── TC-1: Valid document creation────
 
 describe('TC-1: Valid document creation', () => {
     it('creates a User with valid data', async () => {
@@ -314,7 +314,7 @@ describe('TC-6: AnalyticsSnapshot compound unique index', () => {
     });
 });
 
-// ─── TC-7: ApiKey.generateApiKey() ──────────────────────────
+// ─── TC-7: ApiKey.generateApiKey()───
 
 describe('TC-7: ApiKey key generation and verification', () => {
     it('generates { fullKey, keyPrefix, keyHash } with correct format', async () => {

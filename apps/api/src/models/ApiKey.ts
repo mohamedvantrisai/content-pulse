@@ -2,8 +2,7 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 import bcrypt from 'bcryptjs';
 import { randomBytes } from 'node:crypto';
 
-// ─── Constants ───────────────────────────────────────────────
-
+// ─── Constants ───
 const BCRYPT_ROUNDS = 12;
 const KEY_BODY_LENGTH = 40;
 const KEY_PREFIX_LENGTH = 12;
@@ -19,8 +18,7 @@ export const API_KEY_SCOPES = [
 
 export type ApiKeyScope = (typeof API_KEY_SCOPES)[number];
 
-// ─── Interfaces ──────────────────────────────────────────────
-
+// ─── Interfaces ───
 export interface IApiKey {
     userId: mongoose.Types.ObjectId;
     name: string;
@@ -53,8 +51,7 @@ export interface IApiKeyModel extends Model<IApiKeyDocument> {
     findByPrefix(prefix: string): Promise<IApiKeyDocument | null>;
 }
 
-// ─── Schema ──────────────────────────────────────────────────
-
+// ─── Schema ────
 const apiKeySchema = new Schema<IApiKeyDocument, IApiKeyModel>(
     {
         userId: {
@@ -106,8 +103,7 @@ const apiKeySchema = new Schema<IApiKeyDocument, IApiKeyModel>(
     { timestamps: true },
 );
 
-// ─── Indexes ─────────────────────────────────────────────────
-
+// ─── Indexes ───
 apiKeySchema.index(
     { userId: 1, isActive: 1 },
     { name: 'userId_isActive' },
@@ -117,8 +113,7 @@ apiKeySchema.index(
     { sparse: true, name: 'expiresAt_sparse' },
 );
 
-// ─── Static Methods ──────────────────────────────────────────
-
+// ─── Static Methods ───
 apiKeySchema.statics.generateApiKey = async function (): Promise<IGenerateApiKeyResult> {
     const body = randomBytes(KEY_BODY_LENGTH).toString('hex').slice(0, KEY_BODY_LENGTH);
     const fullKey = `${KEY_PREFIX_TAG}${body}`;
@@ -134,8 +129,7 @@ apiKeySchema.statics.findByPrefix = function (
     return this.findOne({ keyPrefix: prefix, isActive: true }).select('+keyHash').exec();
 };
 
-// ─── Instance Methods ────────────────────────────────────────
-
+// ─── Instance Methods ───
 apiKeySchema.methods.verifyApiKey = async function (
     this: IApiKeyDocument,
     candidateKey: string,
@@ -158,8 +152,7 @@ apiKeySchema.methods.recordUsage = async function (
     await this.save();
 };
 
-// ─── Serialisation ───────────────────────────────────────────
-
+// ─── Serialisation ────
 apiKeySchema.set('toJSON', {
     transform(_doc, ret) {
         const { keyHash: _, __v: __, ...rest } = ret;
@@ -167,6 +160,5 @@ apiKeySchema.set('toJSON', {
     },
 });
 
-// ─── Model ───────────────────────────────────────────────────
-
+// ─── Model ────
 export const ApiKey = mongoose.model<IApiKeyDocument, IApiKeyModel>('ApiKey', apiKeySchema);

@@ -1,7 +1,6 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-// ─── Interfaces ──────────────────────────────────────────────
-
+// ─── Interfaces ─
 export interface ISnapshotMetrics {
     totalPosts: number;
     totalImpressions: number;
@@ -29,8 +28,7 @@ export interface IAnalyticsSnapshotDocument extends IAnalyticsSnapshot, Document
 
 export type IAnalyticsSnapshotModel = Model<IAnalyticsSnapshotDocument>;
 
-// ─── Sub-Schema ──────────────────────────────────────────────
-
+// ─── Sub-Schema ──
 const snapshotMetricsSchema = new Schema(
     {
         totalPosts: { type: Number, default: 0 },
@@ -46,8 +44,7 @@ const snapshotMetricsSchema = new Schema(
     { _id: false },
 );
 
-// ─── Schema ──────────────────────────────────────────────────
-
+// ─── Schema ───
 const analyticsSnapshotSchema = new Schema<
     IAnalyticsSnapshotDocument,
     IAnalyticsSnapshotModel
@@ -91,8 +88,7 @@ const analyticsSnapshotSchema = new Schema<
     { timestamps: true },
 );
 
-// ─── Indexes ─────────────────────────────────────────────────
-
+// ─── Indexes ─────
 analyticsSnapshotSchema.index(
     { channelId: 1, period: 1, date: 1 },
     { unique: true, name: 'channelId_period_date_unique' },
@@ -106,8 +102,7 @@ analyticsSnapshotSchema.index(
     { name: 'channelId_date_desc' },
 );
 
-// ─── Serialisation ───────────────────────────────────────────
-
+// ─── Serialisation ──
 analyticsSnapshotSchema.set('toJSON', {
     transform(_doc, ret) {
         const { __v: _, ...rest } = ret;
@@ -115,8 +110,7 @@ analyticsSnapshotSchema.set('toJSON', {
     },
 });
 
-// ─── Model ───────────────────────────────────────────────────
-
+// ─── Model ──
 export const AnalyticsSnapshot = mongoose.model<
     IAnalyticsSnapshotDocument,
     IAnalyticsSnapshotModel

@@ -1,11 +1,11 @@
-// ─── Models ──────────────────────────────────────────────────
+// ─── Models ─────
 export { User } from './User.js';
 export { Channel } from './Channel.js';
 export { Post } from './Post.js';
 export { AnalyticsSnapshot } from './AnalyticsSnapshot.js';
 export { ApiKey, API_KEY_SCOPES } from './ApiKey.js';
 
-// ─── Interfaces & Types ─────────────────────────────────────
+// ─── Interfaces & Types ───
 export type { IUser, IUserDocument, IUserModel, IEmailReportPreferences } from './User.js';
 export type { IChannel, IChannelDocument, IChannelModel } from './Channel.js';
 export type {

@@ -1,8 +1,7 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import { encrypt, decrypt, isEncrypted } from '../utils/encryption.js';
 
-// ─── Interfaces ──────────────────────────────────────────────
-
+// ─── Interfaces ───
 export interface IChannel {
     userId: mongoose.Types.ObjectId;
     platform: 'instagram' | 'linkedin';
@@ -28,8 +27,7 @@ export interface IChannelDocument extends IChannel, Document {
 
 export type IChannelModel = Model<IChannelDocument>;
 
-// ─── Schema ──────────────────────────────────────────────────
-
+// ─── Schema ──────────
 const channelSchema = new Schema<IChannelDocument, IChannelModel>(
     {
         userId: {
@@ -98,8 +96,7 @@ const channelSchema = new Schema<IChannelDocument, IChannelModel>(
     { timestamps: true },
 );
 
-// ─── Indexes ─────────────────────────────────────────────────
-
+// ─── Indexes ────
 channelSchema.index(
     { userId: 1, platform: 1, platformAccountId: 1 },
     { unique: true, name: 'userId_platform_platformAccountId_unique' },
@@ -109,8 +106,7 @@ channelSchema.index(
     { name: 'userId_syncStatus' },
 );
 
-// ─── Hooks ───────────────────────────────────────────────────
-
+// ─── Hooks ─────
 channelSchema.pre('save', function (next) {
     if (this.isModified('accessToken') && this.accessToken && !isEncrypted(this.accessToken)) {
         this.accessToken = encrypt(this.accessToken);
@@ -123,8 +119,7 @@ channelSchema.pre('save', function (next) {
     next();
 });
 
-// ─── Methods ─────────────────────────────────────────────────
-
+// ─── Methods ───
 channelSchema.methods.getDecryptedAccessToken = function (
     this: IChannelDocument,
 ): string {
@@ -138,8 +133,7 @@ channelSchema.methods.getDecryptedRefreshToken = function (
     return decrypt(this.refreshToken);
 };
 
-// ─── Serialisation ───────────────────────────────────────────
-
+// ─── Serialisation ──
 channelSchema.set('toJSON', {
     transform(_doc, ret) {
         const { accessToken: _, refreshToken: __, __v: ___, ...rest } = ret;
@@ -147,6 +141,5 @@ channelSchema.set('toJSON', {
     },
 });
 
-// ─── Model ───────────────────────────────────────────────────
-
+// ─── Model ──────
 export const Channel = mongoose.model<IChannelDocument, IChannelModel>('Channel', channelSchema);

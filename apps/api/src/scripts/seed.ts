@@ -5,7 +5,13 @@
 async function seed(): Promise<void> {
   console.log('Seed script placeholder — no database connection configured yet.');
   console.log('This will be implemented in a future PR.');
-  process.exit(0);
 }
 
-seed();
+async function main(): Promise<void> {
+  await seed();
+}
+
+void main().catch((err) => {
+  console.error('Seed script failed:', err);
+  process.exitCode = 1;
+});

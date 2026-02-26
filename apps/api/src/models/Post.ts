@@ -1,7 +1,6 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-// ─── Interfaces ──────────────────────────────────────────────
-
+/**Interfaces*/
 export interface IPostMetrics {
     impressions: number;
     reach: number;
@@ -38,8 +37,7 @@ export interface IPostDocument extends IPost, Document { }
 
 export type IPostModel = Model<IPostDocument>;
 
-// ─── Sub-Schemas ─────────────────────────────────────────────
-
+/**Sub-Schemas*/
 const postMetricsSchema = new Schema(
     {
         impressions: { type: Number, default: 0, min: 0 },
@@ -62,16 +60,14 @@ const metricsHistoryEntrySchema = new Schema(
     { _id: false },
 );
 
-// ─── Helpers ─────────────────────────────────────────────────
-
+/**Helpers*/
 /** Computes engagement rate as (engagements / impressions) × 100. */
 function computeEngagementRate(metrics: IPostMetrics): number {
     if (!metrics || metrics.impressions <= 0) return 0;
     return parseFloat(((metrics.engagements / metrics.impressions) * 100).toFixed(4));
 }
 
-// ─── Schema ──────────────────────────────────────────────────
-
+/**Schema*/
 const postSchema = new Schema<IPostDocument, IPostModel>(
     {
         channelId: {
@@ -129,8 +125,7 @@ const postSchema = new Schema<IPostDocument, IPostModel>(
     { timestamps: true },
 );
 
-// ─── Indexes ─────────────────────────────────────────────────
-
+/**Indexes*/
 postSchema.index(
     { userId: 1, publishedAt: -1 },
     { name: 'userId_publishedAt_desc' },
@@ -148,8 +143,7 @@ postSchema.index(
     { name: 'userId_engagementRate_publishedAt' },
 );
 
-// ─── Hooks ───────────────────────────────────────────────────
-
+/**Hooks*/
 postSchema.pre('save', function (next) {
     if (this.isModified('metrics')) {
         this.engagementRate = computeEngagementRate(this.metrics);
@@ -170,8 +164,7 @@ postSchema.pre('findOneAndUpdate', function (next) {
     next();
 });
 
-// ─── Serialisation ───────────────────────────────────────────
-
+/**Serialisation*/
 postSchema.set('toJSON', {
     transform(_doc, ret) {
         const { __v: _, ...rest } = ret;
@@ -179,6 +172,5 @@ postSchema.set('toJSON', {
     },
 });
 
-// ─── Model ───────────────────────────────────────────────────
-
+/**Model*/
 export const Post = mongoose.model<IPostDocument, IPostModel>('Post', postSchema);

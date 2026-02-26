@@ -1,8 +1,7 @@
-import mongoose, { Schema, Document, Model } from 'mongoose';
+import mongoose, {Schema, Document, Model} from 'mongoose';
 import bcrypt from 'bcryptjs';
 
-// ─── Interfaces ──────────────────────────────────────────────
-
+/**Interfaces*/
 export interface IEmailReportPreferences {
     enabled: boolean;
     frequency: 'daily' | 'weekly' | 'monthly';
@@ -27,24 +26,22 @@ export interface IUserDocument extends IUser, Document {
 
 export type IUserModel = Model<IUserDocument>;
 
-// ─── Sub-Schema ──────────────────────────────────────────────
-
+/**Sub-Schema*/
 const emailReportPreferencesSchema = new Schema(
     {
-        enabled: { type: Boolean, default: false },
+        enabled: {type: Boolean, default: false},
         frequency: {
             type: String,
             enum: ['daily', 'weekly', 'monthly'],
             default: 'weekly',
         },
-        dayOfWeek: { type: Number, min: 0, max: 6, default: 1 },
-        channelIds: [{ type: Schema.Types.ObjectId, ref: 'Channel' }],
+        dayOfWeek: {type: Number, min: 0, max: 6, default: 1},
+        channelIds: [{type: Schema.Types.ObjectId, ref: 'Channel'}],
     },
-    { _id: false },
+    {_id: false},
 );
 
-// ─── Schema ──────────────────────────────────────────────────
-
+/**Schema*/
 const BCRYPT_ROUNDS = 12;
 
 const userSchema = new Schema<IUserDocument, IUserModel>(
@@ -85,11 +82,10 @@ const userSchema = new Schema<IUserDocument, IUserModel>(
             default: () => ({}),
         },
     },
-    { timestamps: true },
+    {timestamps: true},
 );
 
-// ─── Hooks ───────────────────────────────────────────────────
-
+/**Hooks*/
 userSchema.pre('save', async function (next) {
     if (!this.isModified('passwordHash')) return next();
 
@@ -102,8 +98,7 @@ userSchema.pre('save', async function (next) {
     next();
 });
 
-// ─── Methods ─────────────────────────────────────────────────
-
+/**Methods*/
 userSchema.methods.comparePassword = async function (
     this: IUserDocument,
     candidate: string,
@@ -111,15 +106,13 @@ userSchema.methods.comparePassword = async function (
     return bcrypt.compare(candidate, this.passwordHash);
 };
 
-// ─── Serialisation ───────────────────────────────────────────
-
+/**Serialisation*/
 userSchema.set('toJSON', {
     transform(_doc, ret) {
-        const { passwordHash: _, __v: __, ...rest } = ret;
+        const {passwordHash: _, __v: __, ...rest} = ret;
         return rest;
     },
 });
 
-// ─── Model ───────────────────────────────────────────────────
-
+/**Model*/
 export const User = mongoose.model<IUserDocument, IUserModel>('User', userSchema);
