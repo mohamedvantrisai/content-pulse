@@ -145,7 +145,9 @@ content-pulse/
 ├── apps/
 │   ├── api/                # Express + Apollo backend
 │   │   └── src/
-│   │       ├── config/     # Env, database, redis, logger
+│   │       ├── config/     # Env, database, redis
+│   │       ├── lib/        # Logger (with correlation ID), AsyncLocalStorage context
+│   │       ├── middleware/  # Correlation ID, request logger
 │   │       ├── models/     # Mongoose schemas + TypeScript interfaces
 │   │       ├── utils/      # Encryption, helpers
 │   │       └── server.ts   # Entry point

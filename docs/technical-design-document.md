@@ -122,7 +122,7 @@ This Technical Design Document describes the complete system architecture, data 
     <tr>
       <td>Logging</td>
       <td>Pino</td>
-      <td>8.x</td>
+      <td>9.x</td>
       <td>Structured JSON logging with correlation IDs</td>
     </tr>
     <tr>
@@ -778,8 +778,13 @@ apps/api/src/
 ├── config/
 │   ├── env.ts                   # Zod-validated environment variables
 │   ├── database.ts              # MongoDB connection with retry logic
-│   ├── redis.ts                 # Redis connection (optional, graceful if unavailable)
-│   └── logger.ts                # Pino structured logger
+│   └── redis.ts                 # Redis connection (optional, graceful if unavailable)
+├── lib/
+│   ├── async-context.ts         # AsyncLocalStorage store for request context
+│   └── logger.ts                # Pino logger with auto-injected correlationId
+├── middleware/
+│   ├── correlation.ts           # X-Request-ID generation + AsyncLocalStorage propagation
+│   └── request-logger.ts        # Structured request/response logging
 ├── models/
 │   ├── User.ts                  # User schema + methods
 │   ├── Channel.ts               # Channel schema + encryption hooks
@@ -797,8 +802,7 @@ apps/api/src/
 │   │   ├── auth.ts              # Dual auth: API key + JWT
 │   │   ├── rateLimiter.ts       # Redis token bucket + IETF headers
 │   │   ├── errorHandler.ts      # Structured error responses
-│   │   ├── requestLogger.ts     # Pino request/response logging
-│   │   └── correlationId.ts     # X-Request-ID generation + propagation
+│   │   └── requestLogger.ts     # Pino request/response logging
 │   └── routes/v1/
 │       ├── analytics.routes.ts  # /api/v1/analytics/*
 │       ├── channels.routes.ts   # /api/v1/channels/*
@@ -843,7 +847,7 @@ Every HTTP request passes through the middleware chain in this exact order:
     <tr>
       <td>1</td>
       <td>correlationId</td>
-      <td>Generate UUID, set X-Request-ID header, add to Pino child logger</td>
+      <td>Generate or preserve X-Request-ID header, store in AsyncLocalStorage context. All downstream logs auto-inject correlationId without request object passing.</td>
       <td>Never fails</td>
     </tr>
     <tr>

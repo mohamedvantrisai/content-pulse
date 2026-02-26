@@ -3,7 +3,7 @@
  * TC-6: Verify client connects when REDIS_URL is valid.
  */
 
-jest.mock('../logger.js', () => ({
+jest.mock('../../lib/logger.js', () => ({
     logger: {
         info: jest.fn(),
         warn: jest.fn(),
@@ -11,7 +11,7 @@ jest.mock('../logger.js', () => ({
     },
 }));
 
-import { logger } from '../logger.js';
+import { logger } from '../../lib/logger.js';
 
 describe('redis', () => {
     afterEach(() => {
