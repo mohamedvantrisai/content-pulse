@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { env } from './env.js';
-import { logger } from './logger.js';
+import { logger } from '../lib/logger.js';
 
 const MAX_RETRIES = 3;
 const BASE_DELAY_MS = 1000;

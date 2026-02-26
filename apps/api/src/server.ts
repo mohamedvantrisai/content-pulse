@@ -1,11 +1,15 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import { env, logger, connectDatabase, createRedisClient } from './config/index.js';
+import { env, connectDatabase, createRedisClient } from './config/index.js';
+import { logger } from './lib/logger.js';
+import { correlationMiddleware, requestLogger } from './middleware/index.js';
 
 function createApp(): express.Express {
   const app = express();
 
+  app.use(correlationMiddleware);
+  app.use(requestLogger);
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGINS }));
   app.use(express.json());

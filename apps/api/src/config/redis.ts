@@ -1,6 +1,6 @@
 import Redis from 'ioredis';
 import { env } from './env.js';
-import { logger } from './logger.js';
+import { logger } from '../lib/logger.js';
 
 export type RedisClient = Redis | null;
 

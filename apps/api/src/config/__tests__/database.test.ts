@@ -15,7 +15,7 @@ jest.mock('../env.js', () => ({
     },
 }));
 
-jest.mock('../logger.js', () => ({
+jest.mock('../../lib/logger.js', () => ({
     logger: {
         info: jest.fn(),
         warn: jest.fn(),
@@ -25,7 +25,7 @@ jest.mock('../logger.js', () => ({
 
 import { env } from '../env.js';
 import { connect, disconnect } from '../database.js';
-import { logger } from '../logger.js';
+import { logger } from '../../lib/logger.js';
 
 describe('database', () => {
     let mongoServer: MongoMemoryServer;
