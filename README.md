@@ -52,7 +52,15 @@ You should see both `contentpulse-mongodb` and `contentpulse-redis` with status 
 cp .env.example .env
 ```
 
-Default values in `.env.example` are pre-configured for the Docker Compose setup.
+Default values in `.env.example` are pre-configured for the Docker Compose setup. Update `JWT_SECRET` and `ENCRYPTION_KEY` with real values:
+
+```bash
+# Generate a random JWT secret (min 32 chars)
+node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+
+# Generate a 64-char hex encryption key
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
 
 ### 3. Install Dependencies
 
@@ -72,6 +80,28 @@ npm run dev:dashboard
 # Both simultaneously
 npm run dev:all
 ```
+
+### 5. Verify Everything Works
+
+```bash
+# Health check
+curl http://localhost:4000/health
+
+# REST API (requires Bearer token)
+curl http://localhost:4000/api/v1/status -H "Authorization: Bearer any-token"
+
+# GraphQL (requires Bearer token)
+curl -X POST http://localhost:4000/graphql \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
+  -d '{"query": "{ health { status timestamp } }"}'
+```
+
+### 6. Open GraphQL Playground
+
+Open **http://localhost:4000/graphql** in your browser. Apollo Sandbox loads automatically in development mode.
+
+> **Note:** Apollo Sandbox requires internet access to load its UI from `studio.apollographql.com`. If offline, use Postman, Insomnia, or curl instead.
 
 ---
 
@@ -143,22 +173,39 @@ docker compose -f infra/docker-compose.yml down --volumes
 ```
 content-pulse/
 ├── apps/
-│   ├── api/                # Express + Apollo backend
+│   ├── api/                    # Express + Apollo backend
 │   │   └── src/
-│   │       ├── config/     # Env, database, redis
-│   │       ├── lib/        # Logger (with correlation ID), AsyncLocalStorage context
-│   │       ├── middleware/  # Correlation ID, request logger
-│   │       ├── models/     # Mongoose schemas + TypeScript interfaces
-│   │       ├── utils/      # Encryption, helpers
-│   │       └── server.ts   # Entry point
-│   └── dashboard/          # React + Vite frontend
+│   │       ├── config/         # Env validation, database, redis
+│   │       ├── graphql/        # GraphQL layer
+│   │       │   ├── schema.ts   # Entry point — merges typeDefs + resolvers
+│   │       │   ├── context.ts  # Request context (correlationId + user)
+│   │       │   ├── format-error.ts  # REST-compatible error formatting
+│   │       │   ├── typeDefs/   # Modular SDL by domain
+│   │       │   │   ├── analytics.typeDefs.ts
+│   │       │   │   ├── channel.typeDefs.ts
+│   │       │   │   └── strategist.typeDefs.ts
+│   │       │   └── resolvers/  # Domain resolvers (zero business logic)
+│   │       │       ├── analytics.resolver.ts
+│   │       │       ├── channel.resolver.ts
+│   │       │       └── strategist.resolver.ts
+│   │       ├── lib/            # Logger, AsyncLocalStorage context
+│   │       ├── middleware/     # correlationId, auth, validation, error handler
+│   │       ├── models/         # Mongoose schemas + TypeScript interfaces
+│   │       ├── rest/           # REST layer
+│   │       │   └── routes/v1/  # Versioned routes by domain
+│   │       ├── services/       # Shared service layer (used by REST + GraphQL)
+│   │       ├── utils/          # Encryption, response envelopes
+│   │       ├── app.ts          # Express app + Apollo Server wiring
+│   │       └── server.ts       # Entry point
+│   └── dashboard/              # React + Vite frontend
 ├── docs/
 │   ├── business-requirement-spec.md
 │   └── technical-design-document.md
 ├── infra/
-│   └── docker-compose.yml  # MongoDB + Redis containers
-├── package.json            # Root workspace config
-└── tsconfig.base.json      # Shared TypeScript config
+│   └── docker-compose.yml      # MongoDB + Redis containers
+├── .env.example                # Template for environment variables
+├── package.json                # Root workspace config
+└── tsconfig.base.json          # Shared TypeScript config
 ```
 
 ---
@@ -177,6 +224,75 @@ content-pulse/
 
 All models export TypeScript interfaces from `@contentpulse/api/src/models/index.ts`.
 
+---
+
+## API Endpoints
+
+### REST API (`/api/v1`)
+
+All REST routes require `Authorization: Bearer <token>` header.
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check (no auth required) |
+| GET | `/api/v1/status` | API status |
+| GET | `/api/v1/analytics/overview` | Analytics overview |
+| GET | `/api/v1/channels` | List channels |
+| GET | `/api/v1/strategist/brief` | Content strategy brief |
+| GET | `/api/v1/apikeys` | List API keys |
+
+### GraphQL (`/graphql`)
+
+Requires `Authorization: Bearer <token>` header (same as REST). Available queries:
+
+| Query | Description |
+|-------|-------------|
+| `health` | Health status + timestamp |
+| `analyticsOverview` | Aggregated analytics |
+| `channelAnalytics(channelId, period)` | Per-channel analytics |
+| `channels` | List all channels |
+| `channel(id)` | Single channel by ID |
+| `posts(channelId)` | Posts for a channel |
+| `contentBrief` | Content strategy brief |
+| `platformBreakdown` | Per-platform metrics |
+| `timeSeries(metric, from, to)` | Time series data |
+
+**GraphQL Playground:** Open http://localhost:4000/graphql in your browser (development only).
+
+**Example query:**
+
+```graphql
+{
+  analyticsOverview {
+    totalViews
+    totalEngagement
+    topChannel
+  }
+  channels {
+    id
+    name
+    platform
+  }
+}
+```
+
+---
+
+## Running Tests
+
+```bash
+# Run all tests
+npm test
+
+# Run API tests only
+npm test --workspace=@contentpulse/api
+
+# Run with verbose output
+npm test --workspace=@contentpulse/api -- --verbose
+
+# Run a specific test file
+npm test --workspace=@contentpulse/api -- --testPathPattern=graphql
+```
 
 ---
 

@@ -6,7 +6,7 @@ export interface Channel {
 
 export function listChannels(): Channel[] {
     return [
-        { id: 'ch_1', name: 'Main Twitter', platform: 'twitter' },
-        { id: 'ch_2', name: 'Company Blog', platform: 'blog' },
+        { id: 'ch_1', name: 'Main Instagram', platform: 'instagram' },
+        { id: 'ch_2', name: 'Company LinkedIn', platform: 'linkedin' },
     ];
 }
