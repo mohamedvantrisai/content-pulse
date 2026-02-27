@@ -11,6 +11,8 @@ import { scopeValidator } from './middleware/scope-validator.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
 import { notFoundHandler, errorHandler } from './middleware/error-handler.js';
 import { typeDefs, resolvers } from './graphql/schema.js';
+import { buildContext, type GraphQLContext } from './graphql/context.js';
+import { formatError } from './graphql/format-error.js';
 import v1Router from './rest/routes/v1/index.js';
 
 export interface AppContext {
@@ -74,13 +76,19 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
         });
     });
 
-    const apollo = new ApolloServer({ typeDefs, resolvers });
+    const isProduction = env.NODE_ENV === 'production';
+    const apollo = new ApolloServer<GraphQLContext>({
+        typeDefs,
+        resolvers,
+        formatError,
+        introspection: !isProduction,
+    });
     await apollo.start();
     app.use(
         '/graphql',
         express.json(),
         expressMiddleware(apollo, {
-            context: async () => ({}),
+            context: buildContext,
         }) as unknown as RequestHandler,
     );
 

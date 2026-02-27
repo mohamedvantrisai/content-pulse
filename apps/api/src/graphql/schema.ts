@@ -1,13 +1,7 @@
-export const typeDefs = `#graphql
-  type Query {
-    health: HealthStatus!
-  }
+import { typeDefs as schemaTypeDefs } from './typeDefs/index.js';
+import { resolvers as domainResolvers } from './resolvers/index.js';
 
-  type HealthStatus {
-    status: String!
-    timestamp: String!
-  }
-`;
+export const typeDefs = schemaTypeDefs;
 
 export const resolvers = {
     Query: {
@@ -15,5 +9,6 @@ export const resolvers = {
             status: 'ok',
             timestamp: new Date().toISOString(),
         }),
+        ...domainResolvers.Query,
     },
 };
