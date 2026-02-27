@@ -11,6 +11,25 @@ const baseTypeDefs = `#graphql
     status: String!
     timestamp: String!
   }
+
+  enum Platform {
+    instagram
+    linkedin
+  }
+
+  enum AnalyticsPeriod {
+    daily
+    weekly
+    monthly
+  }
+
+  enum PostType {
+    text
+    image
+    video
+    link
+    carousel
+  }
 `;
 
 /**

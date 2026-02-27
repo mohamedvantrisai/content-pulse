@@ -1,4 +1,5 @@
 import request from 'supertest';
+import jwt from 'jsonwebtoken';
 import type { Express } from 'express';
 
 let app: Express;
@@ -27,7 +28,10 @@ jest.mock('../lib/logger.js', () => ({
     },
 }));
 
-const AUTH_HEADER = 'Bearer test-token';
+const JWT_SECRET = 'a'.repeat(32);
+const VALID_TOKEN = jwt.sign({ sub: 'user-123' }, JWT_SECRET, { expiresIn: '1h' });
+const AUTH_HEADER = `Bearer ${VALID_TOKEN}`;
+const GQL_AUTH_HEADER = AUTH_HEADER;
 
 beforeAll(async () => {
     const { createApp } = await import('../app.js');
@@ -213,6 +217,16 @@ describe('TC-6: Error response matches { error: { code, message } }', () => {
         expect(res.body.error).toHaveProperty('message');
         expect(res.body.error).toHaveProperty('details');
     });
+
+    it('401 rejects forged/invalid-signature token on REST', async () => {
+        const forgedToken = jwt.sign({ sub: 'hacker' }, 'wrong-secret-key-that-is-long-enough', { expiresIn: '1h' });
+        const res = await request(app)
+            .get('/api/v1/analytics/overview')
+            .set('Authorization', `Bearer ${forgedToken}`);
+
+        expect(res.status).toBe(401);
+        expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
+    });
 });
 
 describe('TC-7: X-Request-ID header exists in response', () => {
@@ -257,11 +271,22 @@ describe('GraphQL /graphql', () => {
         const res = await request(app)
             .post('/graphql')
             .send({ query: '{ health { status timestamp } }' })
-            .set('Content-Type', 'application/json');
+            .set('Content-Type', 'application/json')
+            .set('Authorization', GQL_AUTH_HEADER);
 
         expect(res.status).toBe(200);
         expect(res.body.data.health).toHaveProperty('status', 'ok');
         expect(res.body.data.health).toHaveProperty('timestamp');
+    });
+
+    it('rejects GraphQL request without auth (401)', async () => {
+        const res = await request(app)
+            .post('/graphql')
+            .send({ query: '{ health { status } }' })
+            .set('Content-Type', 'application/json');
+
+        expect(res.status).toBe(401);
+        expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
     });
 });
 

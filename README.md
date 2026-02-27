@@ -90,9 +90,10 @@ curl http://localhost:4000/health
 # REST API (requires Bearer token)
 curl http://localhost:4000/api/v1/status -H "Authorization: Bearer any-token"
 
-# GraphQL
+# GraphQL (requires Bearer token)
 curl -X POST http://localhost:4000/graphql \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-jwt-token>" \
   -d '{"query": "{ health { status timestamp } }"}'
 ```
 
@@ -242,7 +243,7 @@ All REST routes require `Authorization: Bearer <token>` header.
 
 ### GraphQL (`/graphql`)
 
-No auth required. Available queries:
+Requires `Authorization: Bearer <token>` header (same as REST). Available queries:
 
 | Query | Description |
 |-------|-------------|

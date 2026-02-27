@@ -2,15 +2,15 @@ export const channelTypeDefs = `#graphql
   type Channel {
     id: ID!
     name: String!
-    platform: String!
+    platform: Platform!
   }
 
   type Post {
     id: ID!
     channelId: ID!
-    platform: String!
+    platform: Platform!
     content: String!
-    postType: String!
+    postType: PostType!
     publishedAt: String!
     metrics: PostMetrics!
     engagementRate: Float!

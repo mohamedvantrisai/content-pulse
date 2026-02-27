@@ -33,9 +33,9 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
      *  2. requestLogger
      *  3. CORS
      *  4. JSON parser (1 MB limit)
-     *  5. auth middleware ── on /api/v1 only
-     *  6. scopeValidator ── on /api/v1 only
-     *  7. rateLimiter ── on /api/v1 only
+     *  5. auth middleware ── on /api/v1 and /graphql
+     *  6. scopeValidator ── on /api/v1 and /graphql
+     *  7. rateLimiter ── on /api/v1 and /graphql
      *  8. route handler
      *  9. errorHandler (global)
      * ────────────────────────────────────────────── */
@@ -87,15 +87,35 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
         introspection: !isProduction,
     });
     await apollo.start();
-    app.use(
+
+    // 5–8. auth → scopeValidator → rateLimiter → route handlers
+    // POST /graphql: full security middleware chain (query execution)
+    app.post(
         '/graphql',
         express.json(),
+        authMiddleware,
+        scopeValidator,
+        rateLimiter,
         expressMiddleware(apollo, {
             context: buildContext,
         }) as unknown as RequestHandler,
     );
+    // GET /graphql: Apollo Sandbox landing page only (non-production).
+    // No expressMiddleware — prevents query execution via GET transport.
+    if (!isProduction) {
+        app.get('/graphql', (_req, res) => {
+            res.type('html').send(
+                `<!DOCTYPE html>
+<html><head><title>Apollo Sandbox</title></head>
+<body style="margin:0;overflow:hidden">
+<div style="width:100vw;height:100vh" id="sandbox"></div>
+<script src="https://embeddable-sandbox.cdn.apollographql.com/_latest/embeddable-sandbox.umd.production.min.js"></script>
+<script>new window.EmbeddedSandbox({ target:'#sandbox', initialEndpoint:window.location.href });</script>
+</body></html>`,
+            );
+        });
+    }
 
-    // 5–8. auth → scopeValidator → rateLimiter → route handlers (versioned REST only)
     app.use('/api/v1', authMiddleware, scopeValidator, rateLimiter, v1Router);
 
     // 9. errorHandler (global)

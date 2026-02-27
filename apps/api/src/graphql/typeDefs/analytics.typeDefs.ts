@@ -7,8 +7,8 @@ export const analyticsTypeDefs = `#graphql
 
   type ChannelAnalytics {
     channelId: ID!
-    platform: String!
-    period: String!
+    platform: Platform!
+    period: AnalyticsPeriod!
     date: String!
     metrics: SnapshotMetrics!
   }
@@ -25,7 +25,7 @@ export const analyticsTypeDefs = `#graphql
   }
 
   type PlatformBreakdown {
-    platform: String!
+    platform: Platform!
     totalImpressions: Int!
     totalEngagements: Int!
     engagementRate: Float!
@@ -38,7 +38,7 @@ export const analyticsTypeDefs = `#graphql
 
   extend type Query {
     analyticsOverview: AnalyticsOverview!
-    channelAnalytics(channelId: ID!, period: String!): [ChannelAnalytics!]!
+    channelAnalytics(channelId: ID!, period: AnalyticsPeriod!): [ChannelAnalytics!]!
     platformBreakdown: [PlatformBreakdown!]!
     timeSeries(metric: String!, from: String, to: String): [TimeSeriesPoint!]!
   }
