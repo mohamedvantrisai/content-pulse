@@ -6,6 +6,9 @@ import { expressMiddleware } from '@apollo/server/express4';
 import mongoose from 'mongoose';
 import { env } from './config/env.js';
 import { correlationMiddleware, requestLogger } from './middleware/index.js';
+import { authMiddleware } from './middleware/auth.js';
+import { scopeValidator } from './middleware/scope-validator.js';
+import { rateLimiter } from './middleware/rate-limiter.js';
 import { notFoundHandler, errorHandler } from './middleware/error-handler.js';
 import { typeDefs, resolvers } from './graphql/schema.js';
 import v1Router from './rest/routes/v1/index.js';
@@ -19,8 +22,26 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
 
     const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
 
+    /* ──────────────────────────────────────────────
+     * Middleware execution order (AC-3):
+     *  1. correlationId
+     *  2. requestLogger
+     *  3. CORS
+     *  4. JSON parser (1 MB limit)
+     *  5. auth middleware        ── on /api/v1 only
+     *  6. scopeValidator         ── on /api/v1 only
+     *  7. rateLimiter            ── on /api/v1 only
+     *  8. route handler
+     *  9. errorHandler (global)
+     * ────────────────────────────────────────────── */
+
+    // 1. correlationId
     app.use(correlationMiddleware);
+
+    // 2. requestLogger
     app.use(requestLogger);
+
+    // 3. CORS
     app.use(helmet());
     app.use(
         cors({
@@ -34,8 +55,11 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
             credentials: true,
         }),
     );
+
+    // 4. JSON parser (1 MB limit)
     app.use(express.json({ limit: '1mb' }));
 
+    // Routes outside versioning: /health, /graphql
     app.get('/health', (_req, res) => {
         const dbState = mongoose.connection.readyState;
         const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : 'disconnected';
@@ -50,8 +74,6 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
         });
     });
 
-    app.use('/api/v1', v1Router);
-
     const apollo = new ApolloServer({ typeDefs, resolvers });
     await apollo.start();
     app.use(
@@ -62,6 +84,10 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
         }) as unknown as RequestHandler,
     );
 
+    // 5–8. auth → scopeValidator → rateLimiter → route handlers (versioned REST only)
+    app.use('/api/v1', authMiddleware, scopeValidator, rateLimiter, v1Router);
+
+    // 9. errorHandler (global)
     app.use(notFoundHandler);
     app.use(errorHandler);
 
