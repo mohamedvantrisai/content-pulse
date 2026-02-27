@@ -23,6 +23,9 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
     const app = express();
 
     const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
+    if (env.NODE_ENV !== 'production') {
+        allowedOrigins.push('https://studio.apollographql.com');
+    }
 
     /* ──────────────────────────────────────────────
      * Middleware execution order (AC-3):
@@ -30,9 +33,9 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
      *  2. requestLogger
      *  3. CORS
      *  4. JSON parser (1 MB limit)
-     *  5. auth middleware        ── on /api/v1 only
-     *  6. scopeValidator         ── on /api/v1 only
-     *  7. rateLimiter            ── on /api/v1 only
+     *  5. auth middleware ── on /api/v1 only
+     *  6. scopeValidator ── on /api/v1 only
+     *  7. rateLimiter ── on /api/v1 only
      *  8. route handler
      *  9. errorHandler (global)
      * ────────────────────────────────────────────── */
