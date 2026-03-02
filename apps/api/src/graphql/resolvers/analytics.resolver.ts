@@ -1,7 +1,8 @@
 import { z } from 'zod';
-import { getAnalyticsOverview } from '../../services/analytics.service.js';
+import { getOverview } from '../../services/analytics.service.js';
 import type { GraphQLContext } from '../context.js';
 import { validateArgs, requireAuth } from '../validation.js';
+import { strictIsoDate } from '../../utils/date-validation.js';
 
 const channelAnalyticsInput = z.object({
     channelId: z.string().min(1, 'channelId is required'),
@@ -16,11 +17,29 @@ const timeSeriesInput = z.object({
     to: z.string().optional(),
 });
 
+const analyticsOverviewInput = z
+    .object({
+        start: strictIsoDate(),
+        end: strictIsoDate(),
+    })
+    .refine((q) => q.end >= q.start, {
+        message: 'end must be greater than or equal to start',
+        path: ['end'],
+    });
+
 export const analyticsResolvers = {
     Query: {
-        analyticsOverview: (_parent: unknown, _args: unknown, ctx: GraphQLContext) => {
+        analyticsOverview: async (
+            _parent: unknown,
+            args: { start?: string; end?: string },
+            ctx: GraphQLContext,
+        ) => {
             requireAuth(ctx);
-            return getAnalyticsOverview();
+            const today = new Date().toISOString().slice(0, 10);
+            const start = args.start ?? today;
+            const end = args.end ?? today;
+            validateArgs(analyticsOverviewInput, { start, end });
+            return getOverview(ctx.user!.id, start, end);
         },
 
         channelAnalytics: (

@@ -1,7 +1,21 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
+
+export interface AuthenticatedUser {
+    id: string;
+    email?: string;
+}
+
+declare global {
+    namespace Express {
+        interface Request {
+            user?: AuthenticatedUser;
+        }
+    }
+}
 
 function unauthorized(message: string): Error & { statusCode: number; code: string } {
     const error = new Error(message) as Error & { statusCode: number; code: string };
@@ -31,8 +45,21 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
     }
 
     try {
-        jwt.verify(token, env.JWT_SECRET);
-        logger.debug({ tokenLength: token.length }, 'auth token verified');
+        const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+        const subject = (decoded['sub'] as string) ?? (decoded['id'] as string);
+        if (!subject) {
+            next(unauthorized('Token missing subject identifier'));
+            return;
+        }
+        if (!mongoose.Types.ObjectId.isValid(subject)) {
+            next(unauthorized('Invalid token subject'));
+            return;
+        }
+        req.user = {
+            id: subject,
+            ...(decoded['email'] && { email: decoded['email'] as string }),
+        };
+        logger.debug({ tokenLength: token.length, userId: subject }, 'auth token verified');
         next();
     } catch {
         next(unauthorized('Invalid or expired token'));

@@ -105,6 +105,10 @@ channelSchema.index(
     { userId: 1, syncStatus: 1 },
     { name: 'userId_syncStatus' },
 );
+channelSchema.index(
+    { userId: 1, platform: 1 },
+    { name: 'userId_platform' },
+);
 
 // ─── Hooks ─────
 channelSchema.pre('save', function (next) {

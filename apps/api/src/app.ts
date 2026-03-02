@@ -103,11 +103,10 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
     await apollo.start();
 
     // 5–8. route handlers
-    // POST /graphql: auth is handled at the resolver level via requireAuth(ctx).
-    // buildContext extracts the JWT user when present, resolvers enforce access.
     app.post(
         '/graphql',
         express.json(),
+        authMiddleware,
         rateLimiter,
         expressMiddleware(apollo, {
             context: buildContext,

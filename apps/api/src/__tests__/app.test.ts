@@ -38,8 +38,19 @@ jest.mock('../services/health.service.js', () => ({
     }),
 }));
 
+jest.mock('../services/analytics.service.js', () => ({
+    getOverview: jest.fn().mockResolvedValue({
+        currentPeriod: { totalImpressions: 0, totalEngagements: 0, totalPosts: 0, avgEngagementRate: 0 },
+        previousPeriod: { totalImpressions: 0, totalEngagements: 0, totalPosts: 0, avgEngagementRate: 0 },
+        changes: { impressionsChangePct: null, engagementsChangePct: null, postsChangePct: null, avgEngagementRateChangePct: null },
+        timeSeries: [],
+        platformBreakdown: [],
+        topPosts: [],
+    }),
+}));
+
 const JWT_SECRET = 'a'.repeat(32);
-const VALID_TOKEN = jwt.sign({ sub: 'user-123' }, JWT_SECRET, { expiresIn: '1h' });
+const VALID_TOKEN = jwt.sign({ sub: '64a1f0b0c1d2e3f4a5b6c7d8' }, JWT_SECRET, { expiresIn: '1h' });
 const AUTH_HEADER = `Bearer ${VALID_TOKEN}`;
 const GQL_AUTH_HEADER = AUTH_HEADER;
 
@@ -59,7 +70,7 @@ describe('TC-1: All REST routes use /api/v1/ prefix', () => {
 
     it('GET /api/v1/analytics/overview is reachable', async () => {
         const res = await request(app)
-            .get('/api/v1/analytics/overview')
+            .get('/api/v1/analytics/overview?start=2025-01-01&end=2025-01-07')
             .set('Authorization', AUTH_HEADER);
 
         expect(res.status).toBe(200);
@@ -171,7 +182,7 @@ describe('TC-4: Each route file exports a Router imported into app.ts', () => {
 describe('TC-5: Valid endpoint returns { data, meta } structure', () => {
     it('GET /api/v1/analytics/overview matches success envelope', async () => {
         const res = await request(app)
-            .get('/api/v1/analytics/overview')
+            .get('/api/v1/analytics/overview?start=2025-01-01&end=2025-01-07')
             .set('Authorization', AUTH_HEADER);
 
         expect(res.status).toBe(200);
