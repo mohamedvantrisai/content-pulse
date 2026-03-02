@@ -35,7 +35,7 @@ function signToken(payload: Record<string, unknown> = { sub: 'user-123', email: 
 
 beforeAll(async () => {
     const { createApp } = await import('../../app.js');
-    app = await createApp({ redisStatus: () => 'ready' });
+    app = await createApp({ redisClient: null });
 });
 
 function gql(query: string, variables?: Record<string, unknown>) {

@@ -31,6 +31,9 @@ describe('database', () => {
     let mongoServer: MongoMemoryServer;
 
     beforeAll(async () => {
+        if (mongoose.connection.readyState !== 0) {
+            await mongoose.disconnect();
+        }
         mongoServer = await MongoMemoryServer.create();
     });
 

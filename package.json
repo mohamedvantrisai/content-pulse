@@ -13,6 +13,7 @@
     "dev:all": "npm run dev --workspace=@contentpulse/api & npm run dev --workspace=@contentpulse/dashboard",
     "build": "npm run build --workspaces",
     "test": "npm run test --workspaces --if-present",
+    "test:coverage": "npm run test:coverage --workspace=@contentpulse/api",
     "lint": "eslint apps/",
     "lint:fix": "eslint apps/ --fix",
     "format": "prettier --write \"apps/**/*.{ts,tsx,json,css}\"",

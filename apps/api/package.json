@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "test": "jest --passWithNoTests",
+    "test:coverage": "jest --coverage",
     "seed": "tsx src/scripts/seed.ts"
   },
   "dependencies": {
@@ -40,6 +41,7 @@
     "mongodb-memory-server": "^10.4.0",
     "supertest": "^7.0.0",
     "ts-jest": "^29.1.2",
+    "ts-node": "^10.9.2",
     "tsx": "^4.19.3"
   }
 }

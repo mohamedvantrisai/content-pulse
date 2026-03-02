@@ -13,17 +13,34 @@ jest.mock('../../lib/logger.js', () => ({
     },
 }));
 
+const origReadyState = Object.getOwnPropertyDescriptor(mongoose.connection, 'readyState');
+const origDb = Object.getOwnPropertyDescriptor(mongoose.connection, 'db');
+
+function restoreMongoProps(): void {
+    if (origReadyState) {
+        Object.defineProperty(mongoose.connection, 'readyState', origReadyState);
+    } else {
+        delete (mongoose.connection as unknown as Record<string, unknown>)['readyState'];
+    }
+    if (origDb) {
+        Object.defineProperty(mongoose.connection, 'db', origDb);
+    } else {
+        delete (mongoose.connection as unknown as Record<string, unknown>)['db'];
+    }
+}
+
 function mockMongoConnected(): void {
-    Object.defineProperty(mongoose.connection, 'readyState', { value: 1, configurable: true });
+    Object.defineProperty(mongoose.connection, 'readyState', { value: 1, configurable: true, writable: true });
     Object.defineProperty(mongoose.connection, 'db', {
         value: { admin: () => ({ ping: () => Promise.resolve({ ok: 1 }) }) },
         configurable: true,
+        writable: true,
     });
 }
 
 function mockMongoDisconnected(): void {
-    Object.defineProperty(mongoose.connection, 'readyState', { value: 0, configurable: true });
-    Object.defineProperty(mongoose.connection, 'db', { value: null, configurable: true });
+    Object.defineProperty(mongoose.connection, 'readyState', { value: 0, configurable: true, writable: true });
+    Object.defineProperty(mongoose.connection, 'db', { value: null, configurable: true, writable: true });
 }
 
 function createMockRedis(overrides?: Partial<Redis>): Redis {
@@ -32,6 +49,7 @@ function createMockRedis(overrides?: Partial<Redis>): Redis {
 
 describe('Health Service', () => {
     afterEach(() => {
+        restoreMongoProps();
         jest.restoreAllMocks();
     });
 
@@ -91,7 +109,7 @@ describe('Health Service', () => {
     });
 
     it('returns degraded when Mongo ping times out', async () => {
-        Object.defineProperty(mongoose.connection, 'readyState', { value: 1, configurable: true });
+        Object.defineProperty(mongoose.connection, 'readyState', { value: 1, configurable: true, writable: true });
         Object.defineProperty(mongoose.connection, 'db', {
             value: {
                 admin: () => ({
@@ -99,6 +117,7 @@ describe('Health Service', () => {
                 }),
             },
             configurable: true,
+            writable: true,
         });
 
         const result = await checkHealth(null);
