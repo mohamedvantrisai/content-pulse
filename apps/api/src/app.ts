@@ -25,8 +25,13 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
 
     const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
     if (env.NODE_ENV !== 'production') {
-        allowedOrigins.push('https://studio.apollographql.com');
+        allowedOrigins.push(
+            'https://studio.apollographql.com',
+            'https://sandbox.embed.apollographql.com',
+        );
     }
+
+    const isProduction = env.NODE_ENV === 'production';
 
     /* ──────────────────────────────────────────────
      * Middleware execution order (AC-3):
@@ -48,7 +53,24 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
     app.use(requestLogger);
 
     // 3. CORS
-    app.use(helmet());
+    app.use(
+        helmet({
+            contentSecurityPolicy: isProduction
+                ? undefined
+                : {
+                      directives: {
+                          defaultSrc: ["'self'"],
+                          scriptSrc: ["'self'", "'unsafe-inline'", 'https://embeddable-sandbox.cdn.apollographql.com'],
+                          frameSrc: ["'self'", 'https://sandbox.embed.apollographql.com'],
+                          connectSrc: ["'self'", 'https://*.apollographql.com'],
+                          imgSrc: ["'self'", 'data:', 'https://apollo-server-landing-page.cdn.apollographql.com'],
+                          styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+                          fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+                      },
+                  },
+            crossOriginEmbedderPolicy: isProduction,
+        }),
+    );
     app.use(
         cors({
             origin(origin, callback) {
@@ -72,7 +94,6 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
         res.status(statusCode).json(result);
     });
 
-    const isProduction = env.NODE_ENV === 'production';
     const apollo = new ApolloServer<GraphQLContext>({
         typeDefs,
         resolvers,
@@ -81,13 +102,12 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
     });
     await apollo.start();
 
-    // 5–8. auth → scopeValidator → rateLimiter → route handlers
-    // POST /graphql: full security middleware chain (query execution)
+    // 5–8. route handlers
+    // POST /graphql: auth is handled at the resolver level via requireAuth(ctx).
+    // buildContext extracts the JWT user when present, resolvers enforce access.
     app.post(
         '/graphql',
         express.json(),
-        authMiddleware,
-        scopeValidator,
         rateLimiter,
         expressMiddleware(apollo, {
             context: buildContext,
