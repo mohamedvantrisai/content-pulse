@@ -1,4 +1,5 @@
 import { logger } from '../lib/logger.js';
+import { Post } from '../models/Post.js';
 import type {
     AnalyticsOverviewResponse,
     ChangeMetrics,
@@ -11,6 +12,23 @@ import {
     aggregatePlatformBreakdown,
     aggregateTopPosts,
 } from './analytics.repository.js';
+
+const FALLBACK_USER_ID = '000000000000000000000000';
+
+/**
+ * Temporary helper while auth is disabled:
+ * - Uses authenticated userId when present
+ * - Otherwise falls back to the first available post owner
+ * - If no posts exist, returns a valid zero ObjectId to yield empty analytics
+ */
+export async function resolveOverviewUserId(userId?: string): Promise<string> {
+    if (userId) return userId;
+
+    const firstPost = await Post.findOne().select('userId').lean();
+    if (firstPost?.userId) return String(firstPost.userId);
+
+    return FALLBACK_USER_ID;
+}
 
 /**
  * Computes percentage change between current and previous values.

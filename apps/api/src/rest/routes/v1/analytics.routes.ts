@@ -2,8 +2,8 @@ import { Router } from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { validate } from '../../../middleware/validate.js';
-import { successResponse, errorResponse } from '../../../utils/response.js';
-import { getOverview } from '../../../services/analytics.service.js';
+import { successResponse } from '../../../utils/response.js';
+import { getOverview, resolveOverviewUserId } from '../../../services/analytics.service.js';
 import { logger } from '../../../lib/logger.js';
 import { strictIsoDate } from '../../../utils/date-validation.js';
 
@@ -25,11 +25,7 @@ const getOverviewSchema = z.object({
 
 router.get('/overview', validate(getOverviewSchema), async (req: Request, res: Response, next: NextFunction) => {
     try {
-        const userId = req.user?.id;
-        if (!userId) {
-            res.status(401).json(errorResponse('UNAUTHORIZED', 'Missing user context'));
-            return;
-        }
+        const userId = await resolveOverviewUserId(req.user?.id);
 
         const { start, end } = req.query as { start: string; end: string };
         const data = await getOverview(userId, start, end);

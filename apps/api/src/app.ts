@@ -6,7 +6,6 @@ import { expressMiddleware } from '@apollo/server/express4';
 import { env } from './config/env.js';
 import { type RedisClient } from './config/redis.js';
 import { correlationMiddleware, requestLogger } from './middleware/index.js';
-import { authMiddleware } from './middleware/auth.js';
 import { scopeValidator } from './middleware/scope-validator.js';
 import { rateLimiter } from './middleware/rate-limiter.js';
 import { notFoundHandler, errorHandler } from './middleware/error-handler.js';
@@ -39,9 +38,8 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
      *  2. requestLogger
      *  3. CORS
      *  4. JSON parser (1 MB limit)
-     *  5. auth middleware ── on /api/v1 and /graphql
-     *  6. scopeValidator ── on /api/v1 and /graphql
-     *  7. rateLimiter ── on /api/v1 and /graphql
+     *  5. scopeValidator ── on /api/v1
+     *  6. rateLimiter ── on /api/v1 and /graphql
      *  8. route handler
      *  9. errorHandler (global)
      * ────────────────────────────────────────────── */
@@ -106,7 +104,6 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
     app.post(
         '/graphql',
         express.json(),
-        authMiddleware,
         rateLimiter,
         expressMiddleware(apollo, {
             context: buildContext,
@@ -128,7 +125,7 @@ export async function createApp(deps?: { redisClient?: RedisClient }): Promise<e
         });
     }
 
-    app.use('/api/v1', authMiddleware, scopeValidator, rateLimiter, v1Router);
+    app.use('/api/v1', scopeValidator, rateLimiter, v1Router);
 
     // 9. errorHandler (global)
     app.use(notFoundHandler);
