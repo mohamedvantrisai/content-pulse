@@ -28,6 +28,16 @@ jest.mock('../lib/logger.js', () => ({
     },
 }));
 
+jest.mock('../services/health.service.js', () => ({
+    checkHealth: jest.fn().mockResolvedValue({
+        status: 'healthy',
+        database: 'connected',
+        redis: 'not configured',
+        uptime: 1.23,
+        timestamp: '2026-01-01T00:00:00.000Z',
+    }),
+}));
+
 const JWT_SECRET = 'a'.repeat(32);
 const VALID_TOKEN = jwt.sign({ sub: 'user-123' }, JWT_SECRET, { expiresIn: '1h' });
 const AUTH_HEADER = `Bearer ${VALID_TOKEN}`;
@@ -35,7 +45,7 @@ const GQL_AUTH_HEADER = AUTH_HEADER;
 
 beforeAll(async () => {
     const { createApp } = await import('../app.js');
-    app = await createApp({ redisStatus: () => 'ready' });
+    app = await createApp({ redisClient: null });
 });
 
 describe('TC-1: All REST routes use /api/v1/ prefix', () => {
@@ -256,7 +266,7 @@ describe('GET /health', () => {
         const res = await request(app).get('/health');
 
         expect(res.status).toBe(200);
-        expect(res.body).toHaveProperty('status', 'ok');
+        expect(res.body).toHaveProperty('status', 'healthy');
         expect(res.body).toHaveProperty('database');
         expect(res.body).toHaveProperty('redis');
         expect(res.body).toHaveProperty('uptime');
