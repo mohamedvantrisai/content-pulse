@@ -1,8 +1,52 @@
 export const analyticsTypeDefs = `#graphql
+  type PeriodMetrics {
+    totalImpressions: Int!
+    totalEngagements: Int!
+    totalPosts: Int!
+    avgEngagementRate: Float!
+  }
+
+  type ChangeMetrics {
+    impressionsChangePct: Float
+    engagementsChangePct: Float
+    postsChangePct: Float
+    avgEngagementRateChangePct: Float
+  }
+
+  type TimeSeriesEntry {
+    date: String!
+    impressions: Int!
+    engagements: Int!
+    posts: Int!
+  }
+
+  type PlatformBreakdownEntry {
+    platform: String!
+    totalImpressions: Int!
+    totalEngagements: Int!
+    totalPosts: Int!
+    avgEngagementRate: Float!
+    followerCount: Int!
+  }
+
+  type TopPostEntry {
+    id: ID!
+    platform: String!
+    content: String!
+    postType: String!
+    impressions: Int!
+    engagements: Int!
+    engagementRate: Float!
+    publishedAt: String!
+  }
+
   type AnalyticsOverview {
-    totalViews: Int!
-    totalEngagement: Int!
-    topChannel: String!
+    currentPeriod: PeriodMetrics!
+    previousPeriod: PeriodMetrics!
+    changes: ChangeMetrics!
+    timeSeries: [TimeSeriesEntry!]!
+    platformBreakdown: [PlatformBreakdownEntry!]!
+    topPosts: [TopPostEntry!]!
   }
 
   type ChannelAnalytics {
@@ -37,7 +81,7 @@ export const analyticsTypeDefs = `#graphql
   }
 
   extend type Query {
-    analyticsOverview: AnalyticsOverview!
+    analyticsOverview(start: String, end: String): AnalyticsOverview!
     channelAnalytics(channelId: ID!, period: AnalyticsPeriod!): [ChannelAnalytics!]!
     platformBreakdown: [PlatformBreakdown!]!
     timeSeries(metric: String!, from: String, to: String): [TimeSeriesPoint!]!

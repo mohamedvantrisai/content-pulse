@@ -142,6 +142,10 @@ postSchema.index(
     { userId: 1, engagementRate: -1, publishedAt: -1 },
     { name: 'userId_engagementRate_publishedAt' },
 );
+postSchema.index(
+    { userId: 1, platform: 1, publishedAt: -1 },
+    { name: 'userId_platform_publishedAt_desc' },
+);
 
 /**Hooks*/
 postSchema.pre('save', function (next) {

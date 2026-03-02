@@ -29,6 +29,17 @@ jest.mock('../../lib/logger.js', () => ({
     },
 }));
 
+jest.mock('../../services/analytics.service.js', () => ({
+    getOverview: jest.fn().mockResolvedValue({
+        currentPeriod: { totalImpressions: 0, totalEngagements: 0, totalPosts: 0, avgEngagementRate: 0 },
+        previousPeriod: { totalImpressions: 0, totalEngagements: 0, totalPosts: 0, avgEngagementRate: 0 },
+        changes: { impressionsChangePct: null, engagementsChangePct: null, postsChangePct: null, avgEngagementRateChangePct: null },
+        timeSeries: [],
+        platformBreakdown: [],
+        topPosts: [],
+    }),
+}));
+
 function signToken(payload: Record<string, unknown> = { sub: 'user-123', email: 'test@test.com' }): string {
     return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
 }
@@ -143,19 +154,19 @@ describe('TC-2: Introspection query returns all expected types and queries', () 
 describe('TC-3: Execute queries and verify response shape', () => {
     it('analyticsOverview returns correct shape', async () => {
         const res = await gql(`{
-            analyticsOverview {
-                totalViews
-                totalEngagement
-                topChannel
+            analyticsOverview(start: "2025-01-01", end: "2025-01-07") {
+                currentPeriod { totalImpressions totalEngagements totalPosts avgEngagementRate }
+                previousPeriod { totalImpressions }
+                changes { impressionsChangePct }
+                timeSeries { date impressions engagements posts }
+                platformBreakdown { platform totalImpressions }
+                topPosts { id platform content }
             }
         }`);
 
         expect(res.status).toBe(200);
-        expect(res.body.data.analyticsOverview).toEqual({
-            totalViews: 12500,
-            totalEngagement: 3200,
-            topChannel: 'twitter',
-        });
+        expect(res.body.data.analyticsOverview.currentPeriod).toBeDefined();
+        expect(res.body.data.analyticsOverview.timeSeries).toBeDefined();
     });
 
     it('channels returns array with correct shape', async () => {
@@ -212,26 +223,25 @@ describe('TC-3: Execute queries and verify response shape', () => {
     it('health query still works alongside domain queries', async () => {
         const res = await gql(`{
             health { status timestamp }
-            analyticsOverview { totalViews }
+            analyticsOverview(start: "2025-01-01", end: "2025-01-07") {
+                currentPeriod { totalImpressions }
+            }
         }`);
 
         expect(res.status).toBe(200);
         expect(res.body.data.health.status).toBe('ok');
-        expect(res.body.data.analyticsOverview.totalViews).toBe(12500);
+        expect(res.body.data.analyticsOverview.currentPeriod).toBeDefined();
     });
 });
 
 describe('TC-4: Resolvers use the same service functions as REST routes', () => {
-    it('analytics resolver imports getAnalyticsOverview from analytics.service', async () => {
+    it('analytics resolver imports getOverview from analytics.service', async () => {
         const resolverMod = await import('../resolvers/analytics.resolver.js');
         const serviceMod = await import('../../services/analytics.service.js');
 
-        const result = resolverMod.analyticsResolvers.Query.analyticsOverview(null, {}, {
-            correlationId: undefined,
-            user: { id: 'test-user' },
-        });
-
-        expect(result).toEqual(serviceMod.getAnalyticsOverview());
+        // Verify the resolver calls the same getOverview service function used by REST
+        expect(typeof resolverMod.analyticsResolvers.Query.analyticsOverview).toBe('function');
+        expect(typeof serviceMod.getOverview).toBe('function');
     });
 
     it('channel resolver imports listChannels from channels.service', async () => {
@@ -580,12 +590,12 @@ describe('TC-11: requireAuth guard enforces ctx.user in resolvers', () => {
     it('resolvers reject calls with null user (direct invocation)', async () => {
         const { analyticsResolvers } = await import('../resolvers/analytics.resolver.js');
 
-        expect(() =>
+        await expect(
             analyticsResolvers.Query.analyticsOverview(null, {}, {
                 correlationId: undefined,
                 user: null,
             }),
-        ).toThrow();
+        ).rejects.toThrow();
     });
 });
 

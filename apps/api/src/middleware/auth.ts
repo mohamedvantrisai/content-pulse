@@ -3,6 +3,19 @@ import jwt from 'jsonwebtoken';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
+export interface AuthenticatedUser {
+    id: string;
+    email?: string;
+}
+
+declare global {
+    namespace Express {
+        interface Request {
+            user?: AuthenticatedUser;
+        }
+    }
+}
+
 function unauthorized(message: string): Error & { statusCode: number; code: string } {
     const error = new Error(message) as Error & { statusCode: number; code: string };
     error.statusCode = 401;
@@ -31,8 +44,13 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
     }
 
     try {
-        jwt.verify(token, env.JWT_SECRET);
-        logger.debug({ tokenLength: token.length }, 'auth token verified');
+        const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+        const user: AuthenticatedUser = {
+            id: (decoded['sub'] as string) ?? (decoded['id'] as string) ?? 'unknown',
+            ...(decoded['email'] && { email: decoded['email'] as string }),
+        };
+        req.user = user;
+        logger.debug({ tokenLength: token.length, userId: user.id }, 'auth token verified');
         next();
     } catch {
         next(unauthorized('Invalid or expired token'));
