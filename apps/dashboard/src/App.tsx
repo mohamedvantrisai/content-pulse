@@ -1,10 +1,19 @@
-function App() {
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import Layout from '@/components/Layout';
+import Overview from '@/pages/Overview';
+import ChannelDetail from '@/pages/ChannelDetail';
+import Strategist from '@/pages/Strategist';
+
+export default function App() {
   return (
-    <div>
-      <h1>Content Pulse Dashboard</h1>
-      <p>Analytics dashboard coming soon.</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<Overview />} />
+          <Route path="channel/:id" element={<ChannelDetail />} />
+          <Route path="strategist" element={<Strategist />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }
-
-export default App;

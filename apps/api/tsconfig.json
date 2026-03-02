@@ -12,12 +12,19 @@
     },
     "baseUrl": "."
   },
+  "ts-node": {
+    "compilerOptions": {
+      "module": "commonjs",
+      "moduleResolution": "node10"
+    }
+  },
   "include": [
     "src/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
-    "src/**/*.test.ts"
+    "src/**/*.test.ts",
+    "src/test/**"
   ]
 }

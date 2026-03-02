@@ -1,22 +1,16 @@
 /**
  * Model test suite — covers all 9 acceptance test cases (TC-1 through TC-9).
- * Uses mongodb-memory-server for isolated in-memory MongoDB.
+ * Uses the global in-memory MongoDB managed by Jest setup.
  */
 
 import mongoose from 'mongoose';
-import { MongoMemoryServer } from 'mongodb-memory-server';
 
-// ─── Mock env BEFORE any model imports
 jest.mock('../../config/env.js', () => ({
     env: {
         ENCRYPTION_KEY:
             '32bd3bb9b3313b9f259f7c8d6c9221f3829c828cf31668f85145e3f0a47b9882',
     },
 }));
-
-// Set ENCRYPTION_KEY on process.env for the encryption utility
-process.env['ENCRYPTION_KEY'] =
-    '32bd3bb9b3313b9f259f7c8d6c9221f3829c828cf31668f85145e3f0a47b9882';
 
 import { User } from '../User.js';
 import { Channel } from '../Channel.js';
@@ -35,25 +29,6 @@ import type {
     IApiKeyDocument,
     ApiKeyScope,
 } from '../index.js';
-
-// ─── Setup & Teardown─────────────────
-
-let mongoServer: MongoMemoryServer;
-
-beforeAll(async () => {
-    mongoServer = await MongoMemoryServer.create();
-    await mongoose.connect(mongoServer.getUri());
-});
-
-afterAll(async () => {
-    await mongoose.disconnect();
-    await mongoServer.stop();
-});
-
-afterEach(async () => {
-    const collections = Object.values(mongoose.connection.collections);
-    await Promise.all(collections.map((c) => c.deleteMany({})));
-});
 
 // ─── Helpers──────
 

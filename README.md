@@ -133,6 +133,7 @@ Environment variables are validated at startup using [Zod](https://zod.dev). Mis
 | `npm run dev:all` | Start API + Dashboard concurrently |
 | `npm run build` | Build all workspaces |
 | `npm run test` | Run tests across all workspaces |
+| `npm run test:coverage` | Run API tests with coverage report |
 | `npm run lint` | Lint with ESLint |
 | `npm run lint:fix` | Auto-fix lint issues |
 | `npm run format` | Format code with Prettier |
@@ -280,8 +281,10 @@ Requires `Authorization: Bearer <token>` header (same as REST). Available querie
 
 ## Running Tests
 
+Tests run against an **in-memory MongoDB** (via `mongodb-memory-server`) and require **no external databases or Redis**. They work identically in local dev and CI.
+
 ```bash
-# Run all tests
+# Run all tests across workspaces
 npm test
 
 # Run API tests only
@@ -290,9 +293,25 @@ npm test --workspace=@contentpulse/api
 # Run with verbose output
 npm test --workspace=@contentpulse/api -- --verbose
 
-# Run a specific test file
-npm test --workspace=@contentpulse/api -- --testPathPattern=graphql
+# Run a single test file
+npx jest apps/api/src/__tests__/document-crud.test.ts
+
+# From within the api workspace
+cd apps/api && npx jest src/services/__tests__/health.service.test.ts
+
+# Generate coverage report (outputs to apps/api/coverage/)
+npm run test:coverage --workspace=@contentpulse/api
 ```
+
+### Test Architecture
+
+| Layer | File | Purpose |
+|-------|------|---------|
+| Global setup | `src/test/global-setup.ts` | Starts MongoMemoryServer, sets test env vars |
+| Global teardown | `src/test/global-teardown.ts` | Stops MongoMemoryServer, closes handles |
+| Per-worker setup | `src/test/setup.ts` | Connects mongoose, cleans collections between tests |
+| Mongo helper | `src/test/mongo-manager.ts` | Reusable `getMongoUri()`, `clearDatabase()`, etc. |
+| App helper | `src/test/app-helper.ts` | `getTestApp()` for supertest (no port binding) |
 
 ---
 
