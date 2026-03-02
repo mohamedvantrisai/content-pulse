@@ -7,7 +7,7 @@ async function bootstrap(): Promise<void> {
   const redis = createRedisClient();
 
   const app = await createApp({
-    redisStatus: () => (redis ? redis.status : 'not configured'),
+    redisClient: redis,
   });
 
   app.listen(env.PORT, () => {

@@ -3,8 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { ApolloServer } from '@apollo/server';
 import { expressMiddleware } from '@apollo/server/express4';
-import mongoose from 'mongoose';
 import { env } from './config/env.js';
+import { type RedisClient } from './config/redis.js';
 import { correlationMiddleware, requestLogger } from './middleware/index.js';
 import { authMiddleware } from './middleware/auth.js';
 import { scopeValidator } from './middleware/scope-validator.js';
@@ -14,12 +14,13 @@ import { typeDefs, resolvers } from './graphql/schema.js';
 import { buildContext, type GraphQLContext } from './graphql/context.js';
 import { formatError } from './graphql/format-error.js';
 import v1Router from './rest/routes/v1/index.js';
+import { checkHealth } from './services/health.service.js';
 
 export interface AppContext {
-    redisStatus: () => string;
+    redisClient?: RedisClient;
 }
 
-export async function createApp(deps?: { redisStatus?: () => string }): Promise<express.Express> {
+export async function createApp(deps?: { redisClient?: RedisClient }): Promise<express.Express> {
     const app = express();
 
     const allowedOrigins = env.CORS_ORIGINS.split(',').map((o) => o.trim());
@@ -65,18 +66,10 @@ export async function createApp(deps?: { redisStatus?: () => string }): Promise<
     app.use(express.json({ limit: '1mb' }));
 
     // Routes outside versioning: /health, /graphql
-    app.get('/health', (_req, res) => {
-        const dbState = mongoose.connection.readyState;
-        const dbStatus = dbState === 1 ? 'connected' : dbState === 2 ? 'connecting' : 'disconnected';
-        const redisStatus = deps?.redisStatus?.() ?? 'not configured';
-
-        res.json({
-            status: 'ok',
-            database: dbStatus,
-            redis: redisStatus,
-            uptime: process.uptime(),
-            timestamp: new Date().toISOString(),
-        });
+    app.get('/health', async (_req, res) => {
+        const result = await checkHealth(deps?.redisClient ?? null);
+        const statusCode = result.status === 'healthy' ? 200 : 503;
+        res.status(statusCode).json(result);
     });
 
     const isProduction = env.NODE_ENV === 'production';
