@@ -209,6 +209,26 @@ describe('TC-X3: Auth enforcement', () => {
         expect(res.status).toBe(401);
         expect(res.body.error.code).toBe('UNAUTHORIZED');
     });
+
+    it('returns 401 for JWT with valid signature but missing sub/id', async () => {
+        const noSubToken = jwt.sign({ email: 'nobody@test.com' }, JWT_SECRET, { expiresIn: '1h' });
+        const res = await request(app)
+            .get('/api/v1/analytics/overview?start=2025-01-01&end=2025-01-07')
+            .set('Authorization', `Bearer ${noSubToken}`);
+
+        expect(res.status).toBe(401);
+        expect(res.body.error.code).toBe('UNAUTHORIZED');
+    });
+
+    it('returns 401 for JWT with valid signature but non-ObjectId subject', async () => {
+        const badSubToken = jwt.sign({ sub: 'not-an-objectid' }, JWT_SECRET, { expiresIn: '1h' });
+        const res = await request(app)
+            .get('/api/v1/analytics/overview?start=2025-01-01&end=2025-01-07')
+            .set('Authorization', `Bearer ${badSubToken}`);
+
+        expect(res.status).toBe(401);
+        expect(res.body.error.code).toBe('UNAUTHORIZED');
+    });
 });
 
 /* ════════════════════════════════════════════════════
@@ -263,6 +283,46 @@ describe('TC-X4: Invalid date format validation', () => {
 
         expect(res.status).toBe(400);
         expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('returns 400 for calendar-invalid month (2026-13-01)', async () => {
+        const res = await request(app)
+            .get('/api/v1/analytics/overview?start=2026-13-01&end=2026-13-07')
+            .set('Authorization', AUTH);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        expect(res.body.error.message).toBe('Invalid date format. Use ISO 8601 (YYYY-MM-DD).');
+        const messages = res.body.error.details.map((d: { message: string }) => d.message);
+        expect(messages).toContain('Invalid date format. Use ISO 8601 (YYYY-MM-DD).');
+    });
+
+    it('returns 400 for calendar-invalid day (2026-02-30)', async () => {
+        const res = await request(app)
+            .get('/api/v1/analytics/overview?start=2026-02-30&end=2026-03-01')
+            .set('Authorization', AUTH);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+        expect(res.body.error.message).toBe('Invalid date format. Use ISO 8601 (YYYY-MM-DD).');
+    });
+
+    it('returns 400 for Feb 29 in a non-leap year (2025-02-29)', async () => {
+        const res = await request(app)
+            .get('/api/v1/analytics/overview?start=2025-02-29&end=2025-03-01')
+            .set('Authorization', AUTH);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it('top-level error.message is the exact invalid-date string for regex-invalid input too', async () => {
+        const res = await request(app)
+            .get('/api/v1/analytics/overview?start=not-a-date&end=2025-01-07')
+            .set('Authorization', AUTH);
+
+        expect(res.status).toBe(400);
+        expect(res.body.error.message).toBe('Invalid date format. Use ISO 8601 (YYYY-MM-DD).');
     });
 });
 
@@ -617,6 +677,76 @@ describe('Story D: Platform Breakdown', () => {
 
         expect(res.body.data.platformBreakdown).toHaveLength(1);
         expect(res.body.data.platformBreakdown[0].platform).toBe('instagram');
+    });
+});
+
+/* ════════════════════════════════════════════════════
+ * TC-X6: Orphan posts (platform with no channel record)
+ * ════════════════════════════════════════════════════ */
+
+describe('TC-X6: Orphan posts (platform without channel)', () => {
+    it('includes orphan-post platform in breakdown so sums match totals', async () => {
+        // Create channel only for instagram, but create posts for both platforms
+        const orphanUserId = new mongoose.Types.ObjectId();
+        const orphanToken = jwt.sign({ sub: orphanUserId.toString() }, JWT_SECRET, { expiresIn: '1h' });
+
+        const igChannel = await Channel.create(
+            makeChannel({ userId: orphanUserId, platform: 'instagram', followerCount: 1000 }),
+        );
+
+        // Instagram post (has channel)
+        await Post.create(
+            makePost({
+                userId: orphanUserId,
+                channelId: igChannel._id,
+                platform: 'instagram',
+                publishedAt: new Date('2025-01-02T10:00:00.000Z'),
+                metrics: { impressions: 500, reach: 400, engagements: 50, likes: 25, comments: 10, shares: 5, clicks: 5, saves: 5 },
+                engagementRate: 10,
+            }),
+        );
+
+        // LinkedIn post (NO channel for linkedin — orphan)
+        await Post.create(
+            makePost({
+                userId: orphanUserId,
+                channelId: new mongoose.Types.ObjectId(),
+                platform: 'linkedin',
+                publishedAt: new Date('2025-01-03T10:00:00.000Z'),
+                metrics: { impressions: 300, reach: 200, engagements: 30, likes: 15, comments: 5, shares: 5, clicks: 3, saves: 2 },
+                engagementRate: 10,
+            }),
+        );
+
+        const res = await request(app)
+            .get('/api/v1/analytics/overview?start=2025-01-01&end=2025-01-07')
+            .set('Authorization', `Bearer ${orphanToken}`);
+
+        expect(res.status).toBe(200);
+        const { currentPeriod, platformBreakdown } = res.body.data;
+
+        // Both platforms must appear
+        const platforms = platformBreakdown.map((p: { platform: string }) => p.platform).sort();
+        expect(platforms).toEqual(['instagram', 'linkedin']);
+
+        // Sums must match overall totals (AC-X1)
+        const sumImpressions = platformBreakdown.reduce(
+            (s: number, p: { totalImpressions: number }) => s + p.totalImpressions, 0,
+        );
+        const sumEngagements = platformBreakdown.reduce(
+            (s: number, p: { totalEngagements: number }) => s + p.totalEngagements, 0,
+        );
+        const sumPosts = platformBreakdown.reduce(
+            (s: number, p: { totalPosts: number }) => s + p.totalPosts, 0,
+        );
+
+        expect(sumImpressions).toBe(currentPeriod.totalImpressions);
+        expect(sumEngagements).toBe(currentPeriod.totalEngagements);
+        expect(sumPosts).toBe(currentPeriod.totalPosts);
+
+        // Orphan platform should have followerCount = 0
+        const li = platformBreakdown.find((p: { platform: string }) => p.platform === 'linkedin');
+        expect(li.followerCount).toBe(0);
     });
 });
 

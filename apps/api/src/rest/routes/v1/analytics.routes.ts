@@ -5,20 +5,15 @@ import { validate } from '../../../middleware/validate.js';
 import { successResponse, errorResponse } from '../../../utils/response.js';
 import { getOverview } from '../../../services/analytics.service.js';
 import { logger } from '../../../lib/logger.js';
+import { strictIsoDate } from '../../../utils/date-validation.js';
 
 const router: Router = Router();
-
-const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const getOverviewSchema = z.object({
     query: z
         .object({
-            start: z
-                .string({ required_error: 'start is required' })
-                .regex(ISO_DATE_REGEX, 'Invalid date format. Use ISO 8601 (YYYY-MM-DD).'),
-            end: z
-                .string({ required_error: 'end is required' })
-                .regex(ISO_DATE_REGEX, 'Invalid date format. Use ISO 8601 (YYYY-MM-DD).'),
+            start: strictIsoDate('start is required'),
+            end: strictIsoDate('end is required'),
         })
         .refine((q) => q.end >= q.start, {
             message: 'end must be greater than or equal to start',

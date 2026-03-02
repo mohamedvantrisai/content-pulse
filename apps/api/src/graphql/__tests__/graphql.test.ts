@@ -40,7 +40,7 @@ jest.mock('../../services/analytics.service.js', () => ({
     }),
 }));
 
-function signToken(payload: Record<string, unknown> = { sub: 'user-123', email: 'test@test.com' }): string {
+function signToken(payload: Record<string, unknown> = { sub: '64a1f0b0c1d2e3f4a5b6c7d8', email: 'test@test.com' }): string {
     return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
 }
 
@@ -401,7 +401,7 @@ describe('TC-7: correlationId exists in GraphQL context', () => {
         const { buildContext } = await import('../context.js');
         const { asyncLocalStorage } = await import('../../lib/async-context.js');
 
-        const token = signToken({ sub: 'usr-456', email: 'dev@test.com' });
+        const token = signToken({ sub: '64b2f1c1d2e3f4a5b6c7d9e0', email: 'dev@test.com' });
 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mockReq = { headers: { authorization: `Bearer ${token}` } } as any;
@@ -414,7 +414,7 @@ describe('TC-7: correlationId exists in GraphQL context', () => {
         );
 
         expect(ctx.correlationId).toBe('ctx-inject-test');
-        expect(ctx.user).toEqual({ id: 'usr-456', email: 'dev@test.com' });
+        expect(ctx.user).toEqual({ id: '64b2f1c1d2e3f4a5b6c7d9e0', email: 'dev@test.com' });
     });
 
     it('buildContext returns null user when no auth header', async () => {
@@ -625,5 +625,44 @@ describe('TC-12: Shared validation helper (validateArgs)', () => {
         const schema = z.object({ name: z.string().min(1) });
         const result = validateArgs(schema, { name: 'hello' });
         expect(result).toEqual({ name: 'hello' });
+    });
+});
+
+describe('TC-13: GraphQL analyticsOverview validation parity with REST', () => {
+    it('rejects start > end with validation error', async () => {
+        const res = await gql(`{
+            analyticsOverview(start: "2025-01-07", end: "2025-01-01") {
+                currentPeriod { totalImpressions }
+            }
+        }`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.errors).toBeDefined();
+        expect(res.body.errors.length).toBeGreaterThan(0);
+        expect(res.body.errors[0].extensions.error).toHaveProperty('code', 'VALIDATION_ERROR');
+    });
+
+    it('rejects calendar-invalid date (2025-13-01) with validation error', async () => {
+        const res = await gql(`{
+            analyticsOverview(start: "2025-13-01", end: "2025-13-07") {
+                currentPeriod { totalImpressions }
+            }
+        }`);
+
+        expect(res.status).toBe(200);
+        expect(res.body.errors).toBeDefined();
+        expect(res.body.errors[0].extensions.error).toHaveProperty('code', 'VALIDATION_ERROR');
+    });
+
+    it('rejects non-ObjectId subject JWT on GraphQL (401)', async () => {
+        const badSubToken = jwt.sign({ sub: 'not-an-objectid' }, JWT_SECRET, { expiresIn: '1h' });
+        const res = await request(app)
+            .post('/graphql')
+            .set('Content-Type', 'application/json')
+            .set('Authorization', `Bearer ${badSubToken}`)
+            .send({ query: '{ health { status } }' });
+
+        expect(res.status).toBe(401);
+        expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
     });
 });

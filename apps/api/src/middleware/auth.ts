@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { env } from '../config/env.js';
 import { logger } from '../lib/logger.js';
 
@@ -45,12 +46,20 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
 
     try {
         const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
-        const user: AuthenticatedUser = {
-            id: (decoded['sub'] as string) ?? (decoded['id'] as string) ?? 'unknown',
+        const subject = (decoded['sub'] as string) ?? (decoded['id'] as string);
+        if (!subject) {
+            next(unauthorized('Token missing subject identifier'));
+            return;
+        }
+        if (!mongoose.Types.ObjectId.isValid(subject)) {
+            next(unauthorized('Invalid token subject'));
+            return;
+        }
+        req.user = {
+            id: subject,
             ...(decoded['email'] && { email: decoded['email'] as string }),
         };
-        req.user = user;
-        logger.debug({ tokenLength: token.length, userId: user.id }, 'auth token verified');
+        logger.debug({ tokenLength: token.length, userId: subject }, 'auth token verified');
         next();
     } catch {
         next(unauthorized('Invalid or expired token'));

@@ -58,8 +58,10 @@ function fillTimeSeriesGaps(
 
 /**
  * Main analytics overview aggregation.
- * Single-source-of-truth (AC-X1): currentPeriod totals are derived by
- * summing the timeSeries results, ensuring consistency.
+ * currentPeriod totals and timeSeries are computed from the same Post
+ * collection via independent aggregation pipelines. AC-X1 consistency
+ * (sum of breakdowns == overall totals) is maintained because both
+ * pipelines use identical userId + date-range $match predicates.
  */
 export async function getOverview(
     userId: string,

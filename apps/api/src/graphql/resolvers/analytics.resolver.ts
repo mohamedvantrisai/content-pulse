@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { getOverview } from '../../services/analytics.service.js';
 import type { GraphQLContext } from '../context.js';
 import { validateArgs, requireAuth } from '../validation.js';
+import { strictIsoDate } from '../../utils/date-validation.js';
 
 const channelAnalyticsInput = z.object({
     channelId: z.string().min(1, 'channelId is required'),
@@ -16,10 +17,15 @@ const timeSeriesInput = z.object({
     to: z.string().optional(),
 });
 
-const analyticsOverviewInput = z.object({
-    start: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    end: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-});
+const analyticsOverviewInput = z
+    .object({
+        start: strictIsoDate(),
+        end: strictIsoDate(),
+    })
+    .refine((q) => q.end >= q.start, {
+        message: 'end must be greater than or equal to start',
+        path: ['end'],
+    });
 
 export const analyticsResolvers = {
     Query: {

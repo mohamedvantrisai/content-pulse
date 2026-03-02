@@ -50,7 +50,7 @@ jest.mock('../services/analytics.service.js', () => ({
 }));
 
 const JWT_SECRET = 'a'.repeat(32);
-const VALID_TOKEN = jwt.sign({ sub: 'user-123' }, JWT_SECRET, { expiresIn: '1h' });
+const VALID_TOKEN = jwt.sign({ sub: '64a1f0b0c1d2e3f4a5b6c7d8' }, JWT_SECRET, { expiresIn: '1h' });
 const AUTH_HEADER = `Bearer ${VALID_TOKEN}`;
 const GQL_AUTH_HEADER = AUTH_HEADER;
 

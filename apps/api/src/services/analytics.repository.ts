@@ -142,15 +142,23 @@ export async function aggregatePlatformBreakdown(
         .lean();
 
     // Group channels by platform, summing followerCount for multiple channels per platform
-    const platformChannels = new Map<string, number>();
+    const platformFollowers = new Map<string, number>();
     for (const ch of channels) {
-        const existing = platformChannels.get(ch.platform) ?? 0;
-        platformChannels.set(ch.platform, existing + ch.followerCount);
+        const existing = platformFollowers.get(ch.platform) ?? 0;
+        platformFollowers.set(ch.platform, existing + ch.followerCount);
     }
 
-    // Merge: every platform that has a channel gets an entry
+    // Ensure orphan-post platforms (posts with no channel record) are also
+    // included so that sum(platformBreakdown) always equals overall totals.
+    for (const r of postResults) {
+        if (!platformFollowers.has(r._id)) {
+            platformFollowers.set(r._id, 0);
+        }
+    }
+
+    // Merge: every platform that has a channel OR posts gets an entry
     const breakdown: PlatformBreakdownEntry[] = [];
-    for (const [platform, followerCount] of platformChannels) {
+    for (const [platform, followerCount] of platformFollowers) {
         const postData = postMap.get(platform);
         const totalImpressions = postData?.totalImpressions ?? 0;
         const totalEngagements = postData?.totalEngagements ?? 0;
