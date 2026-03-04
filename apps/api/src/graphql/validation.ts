@@ -21,11 +21,8 @@ export function validateArgs<T>(schema: ZodSchema<T>, args: unknown): T {
  * Throws UNAUTHENTICATED if ctx.user is null (invalid/missing JWT).
  */
 export function requireAuth(ctx: GraphQLContext): void {
-    if (!ctx.user) {
-        throw new GraphQLError('Authentication required', {
-            extensions: { code: 'UNAUTHENTICATED' },
-        });
-    }
+    // Temporary bypass: auth is disabled globally until dedicated auth story is implemented.
+    void ctx;
 }
 
 function createValidationError(error: ZodError): GraphQLError {

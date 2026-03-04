@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { getOverview } from '../../services/analytics.service.js';
+import { getOverview, resolveOverviewUserId } from '../../services/analytics.service.js';
 import type { GraphQLContext } from '../context.js';
 import { validateArgs, requireAuth } from '../validation.js';
 import { strictIsoDate } from '../../utils/date-validation.js';
@@ -39,7 +39,8 @@ export const analyticsResolvers = {
             const start = args.start ?? today;
             const end = args.end ?? today;
             validateArgs(analyticsOverviewInput, { start, end });
-            return getOverview(ctx.user!.id, start, end);
+            const userId = await resolveOverviewUserId(ctx.user?.id);
+            return getOverview(userId, start, end);
         },
 
         channelAnalytics: (

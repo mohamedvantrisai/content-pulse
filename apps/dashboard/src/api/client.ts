@@ -1,6 +1,6 @@
 import { API_BASE } from './config';
 import type {
-  AnalyticsOverview,
+  AnalyticsOverviewResponse,
   Channel,
   ContentBrief,
   ErrorEnvelope,
@@ -39,6 +39,25 @@ export function createLoadingState<T>(): LoadingState<T> {
 
 type QueryParams = Record<string, string | undefined>;
 
+const AUTH_TOKEN_STORAGE_KEY = 'contentpulse_auth_token';
+
+function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+}
+
+function buildAuthHeaders(headers?: HeadersInit): Headers {
+  const merged = new Headers(headers);
+  const token = getAuthToken();
+  if (token) {
+    merged.set('Authorization', `Bearer ${token}`);
+  }
+  if (!merged.has('Content-Type')) {
+    merged.set('Content-Type', 'application/json');
+  }
+  return merged;
+}
+
 function buildUrl(path: string, params?: QueryParams): string {
   const url = `${API_BASE}${path}`;
   if (!params) return url;
@@ -62,7 +81,7 @@ async function request<T>(
   const { params, ...fetchOptions } = options ?? {};
 
   const response = await fetch(buildUrl(path, params), {
-    headers: { 'Content-Type': 'application/json' },
+    headers: buildAuthHeaders(fetchOptions.headers),
     ...fetchOptions,
   });
 
@@ -103,11 +122,11 @@ function getStatus(): Promise<{ status: string }> {
   return request<{ status: string }>('/status');
 }
 
-function getOverview(params?: {
-  from?: string;
-  to?: string;
-}): Promise<AnalyticsOverview> {
-  return request<AnalyticsOverview>('/analytics/overview', { params });
+function getOverview(params: {
+  start: string;
+  end: string;
+}): Promise<AnalyticsOverviewResponse> {
+  return request<AnalyticsOverviewResponse>('/analytics/overview', { params });
 }
 
 function getChannels(platform?: string): Promise<Channel[]> {
@@ -134,3 +153,14 @@ export const apiClient = {
   getStrategyBrief,
   getApiKeys,
 } as const;
+
+export function setApiAuthToken(token: string | null): void {
+  if (typeof window === 'undefined') return;
+
+  if (!token) {
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+    return;
+  }
+
+  window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+}
