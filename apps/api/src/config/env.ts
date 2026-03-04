@@ -68,7 +68,7 @@ function parseEnv(): Env {
             .map((issue) => `  • ${issue.path.join('.')}: ${issue.message}`)
             .join('\n');
 
-        const message = `\n❌ Environment validation failed:\n${formatted}\n`;
+        const message = `\n[FATAL] Environment validation failed:\n${formatted}\n`;
 
         // In test mode, throw so tests can catch it
         if (process.env['NODE_ENV'] === 'test') {
