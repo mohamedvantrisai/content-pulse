@@ -8,6 +8,7 @@ import { computeDateRange } from '@/utils/dates';
 export interface DashboardState extends LoadingState<AnalyticsOverviewResponse> {
     selectedRange: DateRangeKey;
     setSelectedRange: (range: DateRangeKey) => void;
+    retry: () => void;
 }
 
 /**
@@ -59,6 +60,10 @@ export function useDashboardData(): DashboardState {
         }
     }, []);
 
+    const retry = useCallback(() => {
+        void fetchData(selectedRange);
+    }, [fetchData, selectedRange]);
+
     useEffect(() => {
         void fetchData(selectedRange);
 
@@ -73,5 +78,6 @@ export function useDashboardData(): DashboardState {
         loading,
         selectedRange,
         setSelectedRange,
+        retry,
     };
 }

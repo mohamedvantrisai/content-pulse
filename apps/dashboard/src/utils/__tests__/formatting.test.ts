@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { formatNumber, formatRate, formatChangePct } from '../formatting';
+import {
+    formatNumber,
+    formatRate,
+    formatPercent,
+    formatDate,
+    truncate,
+    formatChangePct,
+} from '../formatting';
 
 describe('formatNumber', () => {
     it('formats small numbers without separators', () => {
@@ -34,6 +41,59 @@ describe('formatRate', () => {
 
     it('handles small rates', () => {
         expect(formatRate(0.001)).toBe('0.1%');
+    });
+});
+
+describe('formatPercent', () => {
+    it('converts decimal to percentage with one decimal place', () => {
+        expect(formatPercent(0.058)).toBe('5.8%');
+    });
+
+    it('handles zero', () => {
+        expect(formatPercent(0)).toBe('0.0%');
+    });
+
+    it('handles 1 (100%)', () => {
+        expect(formatPercent(1)).toBe('100.0%');
+    });
+});
+
+describe('formatDate', () => {
+    it('formats an ISO date string to human-readable format', () => {
+        expect(formatDate('2026-03-04')).toBe('Mar 4, 2026');
+    });
+
+    it('formats an ISO datetime string', () => {
+        expect(formatDate('2026-12-25T10:30:00Z')).toBe('Dec 25, 2026');
+    });
+
+    it('formats a date at the start of the year', () => {
+        expect(formatDate('2026-01-01')).toBe('Jan 1, 2026');
+    });
+});
+
+describe('truncate', () => {
+    it('returns the full string when shorter than maxLength', () => {
+        expect(truncate('Hello world')).toBe('Hello world');
+    });
+
+    it('truncates to 80 chars by default and appends "..."', () => {
+        const long = 'A'.repeat(100);
+        const result = truncate(long);
+        expect(result).toBe('A'.repeat(80) + '...');
+    });
+
+    it('returns exact-length strings without truncation', () => {
+        const exact = 'B'.repeat(80);
+        expect(truncate(exact)).toBe(exact);
+    });
+
+    it('accepts a custom maxLength', () => {
+        expect(truncate('Hello world', 5)).toBe('Hello...');
+    });
+
+    it('handles empty string', () => {
+        expect(truncate('')).toBe('');
     });
 });
 
