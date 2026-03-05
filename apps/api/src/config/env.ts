@@ -47,6 +47,11 @@ const envSchema = z.object({
         .default('info'),
 
     CORS_ORIGINS: z.string().default('http://localhost:5173'),
+
+    META_CLIENT_ID: z.string().optional(),
+    META_CLIENT_SECRET: z.string().optional(),
+    META_REDIRECT_URI: z.string().url('META_REDIRECT_URI must be a valid URL').optional(),
+    DASHBOARD_URL: z.string().url('DASHBOARD_URL must be a valid URL').optional().default('http://localhost:5173'),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -63,7 +68,7 @@ function parseEnv(): Env {
             .map((issue) => `  • ${issue.path.join('.')}: ${issue.message}`)
             .join('\n');
 
-        const message = `\n❌ Environment validation failed:\n${formatted}\n`;
+        const message = `\n[FATAL] Environment validation failed:\n${formatted}\n`;
 
         // In test mode, throw so tests can catch it
         if (process.env['NODE_ENV'] === 'test') {
