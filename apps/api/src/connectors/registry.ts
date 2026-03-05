@@ -1,5 +1,6 @@
 import { type BaseConnector } from './base.connector.js';
 import { InstagramConnector } from './instagram.connector.js';
+import { LinkedInConnector } from './linkedin.connector.js';
 
 /**
  * Connector registry — maps platform identifiers to their connector
@@ -28,3 +29,4 @@ export class ConnectorRegistry {
 }
 
 ConnectorRegistry.register(new InstagramConnector());
+ConnectorRegistry.register(new LinkedInConnector());

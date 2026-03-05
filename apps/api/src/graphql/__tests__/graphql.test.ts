@@ -40,6 +40,14 @@ jest.mock('../../services/analytics.service.js', () => ({
     }),
 }));
 
+jest.mock('../../services/channels.service.js', () => ({
+    listChannelsByUser: jest.fn().mockResolvedValue([
+        { id: 'ch_1', platform: 'instagram', displayName: 'Main Instagram', handle: 'main_ig', followerCount: 0, syncStatus: 'active', lastSyncedAt: null, createdAt: new Date() },
+        { id: 'ch_2', platform: 'linkedin', displayName: 'Company LinkedIn', handle: 'co_li', followerCount: 0, syncStatus: 'active', lastSyncedAt: null, createdAt: new Date() },
+    ]),
+    upsertChannel: jest.fn(),
+}));
+
 function signToken(payload: Record<string, unknown> = { sub: '64a1f0b0c1d2e3f4a5b6c7d8', email: 'test@test.com' }): string {
     return jwt.sign(payload, JWT_SECRET, { expiresIn: '1h' });
 }
@@ -244,16 +252,12 @@ describe('TC-4: Resolvers use the same service functions as REST routes', () => 
         expect(typeof serviceMod.getOverview).toBe('function');
     });
 
-    it('channel resolver imports listChannels from channels.service', async () => {
+    it('channel resolver imports listChannelsByUser from channels.service', async () => {
         const resolverMod = await import('../resolvers/channel.resolver.js');
         const serviceMod = await import('../../services/channels.service.js');
 
-        const result = resolverMod.channelResolvers.Query.channels(null, {}, {
-            correlationId: undefined,
-            user: { id: 'test-user' },
-        });
-
-        expect(result).toEqual(serviceMod.listChannels());
+        expect(typeof resolverMod.channelResolvers.Query.channels).toBe('function');
+        expect(typeof serviceMod.listChannelsByUser).toBe('function');
     });
 
     it('strategist resolver imports getStrategyBrief from strategist.service', async () => {

@@ -37,4 +37,7 @@ export default async function globalSetup(): Promise<void> {
     process.env['META_CLIENT_SECRET'] = 'test-meta-client-secret';
     process.env['META_REDIRECT_URI'] = 'http://localhost:4000/api/v1/channels/instagram/callback';
     process.env['DASHBOARD_URL'] = 'http://localhost:5173';
+    process.env['LINKEDIN_CLIENT_ID'] = 'test-linkedin-client-id';
+    process.env['LINKEDIN_CLIENT_SECRET'] = 'test-linkedin-client-secret';
+    process.env['LINKEDIN_REDIRECT_URI'] = 'http://localhost:4000/api/v1/channels/linkedin/callback';
 }

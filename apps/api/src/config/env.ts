@@ -52,6 +52,13 @@ const envSchema = z.object({
     META_CLIENT_SECRET: z.string().optional(),
     META_REDIRECT_URI: z.string().url('META_REDIRECT_URI must be a valid URL').optional(),
     DASHBOARD_URL: z.string().url('DASHBOARD_URL must be a valid URL').optional().default('http://localhost:5173'),
+
+    LINKEDIN_CLIENT_ID: z.string().optional(),
+    LINKEDIN_CLIENT_SECRET: z.string().optional(),
+    LINKEDIN_REDIRECT_URI: z.string().url('LINKEDIN_REDIRECT_URI must be a valid URL').optional(),
+    LINKEDIN_AUTH_URL: z.string().url().optional(),
+    LINKEDIN_TOKEN_URL: z.string().url().optional(),
+    LINKEDIN_USERINFO_URL: z.string().url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;

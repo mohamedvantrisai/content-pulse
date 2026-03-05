@@ -2,17 +2,36 @@ import mongoose from 'mongoose';
 import { Channel, type IChannelDocument } from '../models/Channel.js';
 import { encrypt } from '../utils/encryption.js';
 
-export interface ChannelListItem {
+export interface ChannelResponse {
     id: string;
-    name: string;
     platform: string;
+    displayName: string;
+    handle: string;
+    followerCount: number;
+    syncStatus: string;
+    lastSyncedAt: Date | null;
+    createdAt: Date;
 }
 
-export function listChannels(): ChannelListItem[] {
-    return [
-        { id: 'ch_1', name: 'Main Instagram', platform: 'instagram' },
-        { id: 'ch_2', name: 'Company LinkedIn', platform: 'linkedin' },
-    ];
+export function toChannelResponse(doc: IChannelDocument): ChannelResponse {
+    return {
+        id: doc._id.toString(),
+        platform: doc.platform,
+        displayName: doc.displayName,
+        handle: doc.handle,
+        followerCount: doc.followerCount,
+        syncStatus: doc.syncStatus,
+        lastSyncedAt: doc.lastSyncedAt ?? null,
+        createdAt: doc.createdAt,
+    };
+}
+
+export async function listChannelsByUser(userId: string): Promise<ChannelResponse[]> {
+    const channels = await Channel.find({
+        userId: new mongoose.Types.ObjectId(userId),
+    }).sort({ createdAt: -1 });
+
+    return channels.map(toChannelResponse);
 }
 
 export interface UpsertChannelParams {
