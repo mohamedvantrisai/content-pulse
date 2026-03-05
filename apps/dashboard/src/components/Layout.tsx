@@ -8,6 +8,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { label: 'Overview', to: '/' },
+  { label: 'Channels', to: '/channels' },
   { label: 'Strategist', to: '/strategist' },
 ];
 

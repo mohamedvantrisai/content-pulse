@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import { validate } from '../../../middleware/validate.js';
 import { authMiddleware } from '../../../middleware/auth.js';
 import { successResponse, errorResponse } from '../../../utils/response.js';
-import { listChannelsByUser, upsertChannel } from '../../../services/channels.service.js';
+import { listChannelsByUser, resolveChannelsUserId, upsertChannel } from '../../../services/channels.service.js';
 import {
     buildAuthUrl as buildInstagramAuthUrl,
     exchangeCodeForToken as exchangeInstagramCode,
@@ -37,7 +37,12 @@ function parseCookies(header: string | undefined): Record<string, string> {
 function dashboardRedirect(params: Record<string, string>): string {
     const base = env.DASHBOARD_URL ?? 'http://localhost:5173';
     const qs = new URLSearchParams(params).toString();
-    return `${base}?${qs}`;
+    return `${base}/channels?${qs}`;
+}
+
+function wantsJson(req: import('express').Request): boolean {
+    const accept = req.headers.accept ?? '';
+    return accept.includes('application/json');
 }
 
 function setStateCookie(
@@ -102,9 +107,10 @@ const listChannelsSchema = z.object({
     params: z.unknown(),
 });
 
-router.get('/', authMiddleware, validate(listChannelsSchema), async (req, res, next) => {
+router.get('/', validate(listChannelsSchema), async (req, res, next) => {
     try {
-        const data = await listChannelsByUser(req.user!.id);
+        const userId = await resolveChannelsUserId(req.user?.id);
+        const data = await listChannelsByUser(userId);
         res.json(successResponse(data));
     } catch (err) {
         next(err);
@@ -120,7 +126,12 @@ router.get('/instagram/connect', authMiddleware, (req, res, next) => {
         const userId = req.user!.id;
         const { url, state } = buildInstagramAuthUrl();
         setStateCookie(res, state, userId, IG_COOKIE_PATH);
-        res.redirect(url);
+
+        if (wantsJson(req)) {
+            res.json(successResponse({ url }));
+        } else {
+            res.redirect(url);
+        }
     } catch (err) {
         next(err);
     }
@@ -208,7 +219,12 @@ router.get('/linkedin/connect', authMiddleware, (req, res, next) => {
         const userId = req.user!.id;
         const { url, state } = buildLinkedInAuthUrl();
         setStateCookie(res, state, userId, LI_COOKIE_PATH);
-        res.redirect(url);
+
+        if (wantsJson(req)) {
+            res.json(successResponse({ url }));
+        } else {
+            res.redirect(url);
+        }
     } catch (err) {
         next(err);
     }

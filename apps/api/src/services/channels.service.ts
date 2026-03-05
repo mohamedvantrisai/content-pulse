@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import { Channel, type IChannelDocument } from '../models/Channel.js';
 import { encrypt } from '../utils/encryption.js';
 
+const FALLBACK_USER_ID = '000000000000000000000000';
+
 export interface ChannelResponse {
     id: string;
     platform: string;
@@ -24,6 +26,19 @@ export function toChannelResponse(doc: IChannelDocument): ChannelResponse {
         lastSyncedAt: doc.lastSyncedAt ?? null,
         createdAt: doc.createdAt,
     };
+}
+
+/**
+ * When auth is present, use the authenticated userId.
+ * Otherwise fall back to the first channel owner or a zero ObjectId.
+ */
+export async function resolveChannelsUserId(userId?: string): Promise<string> {
+    if (userId) return userId;
+
+    const firstChannel = await Channel.findOne().select('userId').lean();
+    if (firstChannel?.userId) return String(firstChannel.userId);
+
+    return FALLBACK_USER_ID;
 }
 
 export async function listChannelsByUser(userId: string): Promise<ChannelResponse[]> {

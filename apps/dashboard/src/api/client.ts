@@ -143,6 +143,14 @@ function getApiKeys(): Promise<unknown[]> {
   return request<unknown[]>('/apikeys');
 }
 
+function getInstagramConnectUrl(): Promise<{ url: string }> {
+  return request<{ url: string }>('/channels/instagram/connect');
+}
+
+function getLinkedInConnectUrl(): Promise<{ url: string }> {
+  return request<{ url: string }>('/channels/linkedin/connect');
+}
+
 // ── Public client singleton ──
 
 export const apiClient = {
@@ -152,6 +160,8 @@ export const apiClient = {
   getChannels,
   getStrategyBrief,
   getApiKeys,
+  getInstagramConnectUrl,
+  getLinkedInConnectUrl,
 } as const;
 
 export function setApiAuthToken(token: string | null): void {

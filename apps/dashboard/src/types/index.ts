@@ -58,10 +58,17 @@ export interface AnalyticsOverviewResponse {
   topPosts: TopPostEntry[];
 }
 
+export type SyncStatus = 'active' | 'paused' | 'error' | 'pending';
+
 export interface Channel {
   id: string;
-  name: string;
   platform: Platform;
+  displayName: string;
+  handle: string;
+  followerCount: number;
+  syncStatus: SyncStatus;
+  lastSyncedAt: string | null;
+  createdAt: string;
 }
 
 export interface PostMetrics {
