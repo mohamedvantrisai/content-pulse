@@ -2,17 +2,51 @@ import mongoose from 'mongoose';
 import { Channel, type IChannelDocument } from '../models/Channel.js';
 import { encrypt } from '../utils/encryption.js';
 
-export interface ChannelListItem {
+const FALLBACK_USER_ID = '000000000000000000000000';
+
+export interface ChannelResponse {
     id: string;
-    name: string;
     platform: string;
+    displayName: string;
+    handle: string;
+    followerCount: number;
+    syncStatus: string;
+    lastSyncedAt: Date | null;
+    createdAt: Date;
 }
 
-export function listChannels(): ChannelListItem[] {
-    return [
-        { id: 'ch_1', name: 'Main Instagram', platform: 'instagram' },
-        { id: 'ch_2', name: 'Company LinkedIn', platform: 'linkedin' },
-    ];
+export function toChannelResponse(doc: IChannelDocument): ChannelResponse {
+    return {
+        id: doc._id.toString(),
+        platform: doc.platform,
+        displayName: doc.displayName,
+        handle: doc.handle,
+        followerCount: doc.followerCount,
+        syncStatus: doc.syncStatus,
+        lastSyncedAt: doc.lastSyncedAt ?? null,
+        createdAt: doc.createdAt,
+    };
+}
+
+/**
+ * When auth is present, use the authenticated userId.
+ * Otherwise fall back to the first channel owner or a zero ObjectId.
+ */
+export async function resolveChannelsUserId(userId?: string): Promise<string> {
+    if (userId) return userId;
+
+    const firstChannel = await Channel.findOne().select('userId').lean();
+    if (firstChannel?.userId) return String(firstChannel.userId);
+
+    return FALLBACK_USER_ID;
+}
+
+export async function listChannelsByUser(userId: string): Promise<ChannelResponse[]> {
+    const channels = await Channel.find({
+        userId: new mongoose.Types.ObjectId(userId),
+    }).sort({ createdAt: -1 });
+
+    return channels.map(toChannelResponse);
 }
 
 export interface UpsertChannelParams {
