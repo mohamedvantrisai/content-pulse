@@ -15,6 +15,8 @@ export interface ChannelsState {
   banner: BannerInfo | null;
   retry: () => void;
   dismissBanner: () => void;
+  updateSyncStatus: (channelId: string, syncStatus: 'active' | 'paused') => Promise<void>;
+  disconnectChannel: (channelId: string) => Promise<void>;
 }
 
 function extractBanner(params: URLSearchParams): BannerInfo | null {
@@ -89,6 +91,23 @@ export function useChannels(): ChannelsState {
     setBanner(null);
   }, []);
 
+  const updateSyncStatus = useCallback(
+    async (channelId: string, syncStatus: 'active' | 'paused') => {
+      const updated = await apiClient.updateChannelSyncStatus(channelId, syncStatus);
+      setData((prev) =>
+        prev
+          ? prev.map((ch) => (ch.id === channelId ? { ...ch, syncStatus: updated.syncStatus } : ch))
+          : prev,
+      );
+    },
+    [],
+  );
+
+  const disconnectChannel = useCallback(async (channelId: string) => {
+    await apiClient.disconnectChannel(channelId);
+    setData((prev) => (prev ? prev.filter((ch) => ch.id !== channelId) : prev));
+  }, []);
+
   useEffect(() => {
     void fetchChannels();
     return () => {
@@ -96,5 +115,5 @@ export function useChannels(): ChannelsState {
     };
   }, [fetchChannels]);
 
-  return { data, error, loading, banner, retry, dismissBanner };
+  return { data, error, loading, banner, retry, dismissBanner, updateSyncStatus, disconnectChannel };
 }

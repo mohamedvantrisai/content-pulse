@@ -177,15 +177,15 @@ describe('TC-B4: Empty state', () => {
     });
 });
 
-// ─── TC-B5: No auth → 401 ─────────────────────────────────
+// ─── TC-B5: No auth → still works (optional auth with fallback) ──
 
-describe('TC-B5: Authentication required', () => {
-    it('returns 401 when no Authorization header is provided', async () => {
+describe('TC-B5: List channels without auth', () => {
+    it('returns 200 with fallback userId when no Authorization header is provided', async () => {
         const res = await request(app)
             .get('/api/v1/channels');
 
-        expect(res.status).toBe(401);
-        expect(res.body).toHaveProperty('error');
-        expect(res.body.error).toHaveProperty('code', 'UNAUTHORIZED');
+        expect(res.status).toBe(200);
+        expect(res.body).toHaveProperty('data');
+        expect(Array.isArray(res.body.data)).toBe(true);
     });
 });

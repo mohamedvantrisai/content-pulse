@@ -58,7 +58,7 @@ export interface AnalyticsOverviewResponse {
   topPosts: TopPostEntry[];
 }
 
-export type SyncStatus = 'active' | 'paused' | 'error' | 'pending';
+export type SyncStatus = 'active' | 'paused' | 'error' | 'pending' | 'inactive';
 
 export interface Channel {
   id: string;
@@ -138,6 +138,27 @@ export interface PlatformBreakdown {
 export interface TimeSeriesPoint {
   date: string;
   value: number;
+}
+
+// ── Channel detail analytics ──
+
+export interface ContentBreakdownEntry {
+  postType: string;
+  count: number;
+  totalImpressions: number;
+  totalEngagements: number;
+}
+
+export interface PostingTimeEntry {
+  hour: number;
+  count: number;
+}
+
+export interface ChannelDetailAnalytics {
+  channel: Channel;
+  timeSeries: TimeSeriesEntry[];
+  contentBreakdown: ContentBreakdownEntry[];
+  postingTimes: PostingTimeEntry[];
 }
 
 // ── API envelope types (mirrors backend response.ts) ──
