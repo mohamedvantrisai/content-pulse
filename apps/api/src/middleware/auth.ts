@@ -24,9 +24,27 @@ function unauthorized(message: string): Error & { statusCode: number; code: stri
     return error;
 }
 
+function tryDecodeToken(req: Request): void {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) return;
+
+    const token = authHeader.slice(7);
+    if (!token) return;
+
+    const decoded = jwt.verify(token, env.JWT_SECRET) as jwt.JwtPayload;
+    const subject = (decoded['sub'] as string) ?? (decoded['id'] as string);
+    if (!subject || !mongoose.Types.ObjectId.isValid(subject)) return;
+
+    req.user = {
+        id: subject,
+        ...(decoded['email'] && { email: decoded['email'] as string }),
+    };
+    logger.debug({ tokenLength: token.length, userId: subject }, 'auth token verified');
+}
+
 /**
- * Centralized JWT auth middleware for both REST and GraphQL.
- * Verifies token signature against JWT_SECRET — not just header shape.
+ * Strict JWT auth middleware — rejects requests without a valid token.
+ * Verifies token signature against JWT_SECRET.
  * Attaches decoded payload to req for downstream consumption.
  */
 export function authMiddleware(req: Request, _res: Response, next: NextFunction): void {
@@ -64,4 +82,18 @@ export function authMiddleware(req: Request, _res: Response, next: NextFunction)
     } catch {
         next(unauthorized('Invalid or expired token'));
     }
+}
+
+/**
+ * Optional auth middleware — attaches req.user when a valid token is present,
+ * but allows the request to proceed without authentication.
+ * Used for endpoints that work with or without auth (e.g. channel listing in dev).
+ */
+export function optionalAuthMiddleware(req: Request, _res: Response, next: NextFunction): void {
+    try {
+        tryDecodeToken(req);
+    } catch {
+        // Token invalid or missing — proceed without auth
+    }
+    next();
 }

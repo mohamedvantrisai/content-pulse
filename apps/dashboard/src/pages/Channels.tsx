@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import type { CSSProperties } from 'react';
+import { useState, useCallback } from 'react';
+import type { CSSProperties, KeyboardEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient, ApiError } from '@/api/client';
 import { useChannels } from '@/hooks/useChannels';
 import type { BannerInfo } from '@/hooks/useChannels';
@@ -108,7 +109,68 @@ function SyncStatusBadge({ status }: { status: SyncStatus }) {
   );
 }
 
-function ChannelTable({ channels }: { channels: Channel[] }) {
+function ConfirmDialog({
+  message,
+  onConfirm,
+  onCancel,
+}: {
+  message: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="confirm-overlay" role="dialog" aria-modal="true">
+      <div className="confirm-dialog">
+        <p className="confirm-dialog__message">{message}</p>
+        <div className="confirm-dialog__actions">
+          <button
+            type="button"
+            className="confirm-dialog__btn confirm-dialog__btn--cancel"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="confirm-dialog__btn confirm-dialog__btn--confirm"
+            onClick={onConfirm}
+          >
+            Disconnect
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChannelTable({
+  channels,
+  onPauseResume,
+  onDisconnect,
+}: {
+  channels: Channel[];
+  onPauseResume: (id: string, status: 'active' | 'paused') => void;
+  onDisconnect: (id: string) => void;
+}) {
+  const navigate = useNavigate();
+
+  const handleRowClick = useCallback(
+    (id: string) => {
+      navigate(`/channel/${id}`);
+    },
+    [navigate],
+  );
+
+  const handleRowKeyDown = useCallback(
+    (e: KeyboardEvent, id: string) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        navigate(`/channel/${id}`);
+      }
+    },
+    [navigate],
+  );
+
   return (
     <div className="channels-table-wrap">
       <table className="channels-table">
@@ -121,11 +183,19 @@ function ChannelTable({ channels }: { channels: Channel[] }) {
             <th>Status</th>
             <th>Last Synced</th>
             <th>Created</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
           {channels.map((ch) => (
-            <tr key={ch.id}>
+            <tr
+              key={ch.id}
+              role="link"
+              tabIndex={0}
+              className="channels-table__row--clickable"
+              onClick={() => handleRowClick(ch.id)}
+              onKeyDown={(e) => handleRowKeyDown(e, ch.id)}
+            >
               <td>
                 <PlatformBadge platform={ch.platform} />
               </td>
@@ -137,6 +207,34 @@ function ChannelTable({ channels }: { channels: Channel[] }) {
               </td>
               <td>{ch.lastSyncedAt ? formatDate(ch.lastSyncedAt) : 'Never'}</td>
               <td>{formatDate(ch.createdAt)}</td>
+              <td
+                onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
+              >
+                <div className="channel-actions">
+                  {(ch.syncStatus === 'active' || ch.syncStatus === 'paused') && (
+                    <button
+                      type="button"
+                      className="channel-action-btn"
+                      onClick={() =>
+                        onPauseResume(
+                          ch.id,
+                          ch.syncStatus === 'active' ? 'paused' : 'active',
+                        )
+                      }
+                    >
+                      {ch.syncStatus === 'active' ? 'Pause' : 'Resume'}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    className="channel-action-btn channel-action-btn--danger"
+                    onClick={() => onDisconnect(ch.id)}
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -182,11 +280,53 @@ function EmptyChannels() {
 // ── Main page ──
 
 export default function Channels() {
-  const { data, error, loading, banner, retry, dismissBanner } = useChannels();
+  const { data, error, loading, banner, retry, dismissBanner, updateSyncStatus, disconnectChannel } =
+    useChannels();
+  const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const handlePauseResume = useCallback(
+    async (channelId: string, syncStatus: 'active' | 'paused') => {
+      setActionError(null);
+      try {
+        await updateSyncStatus(channelId, syncStatus);
+      } catch (err: unknown) {
+        const msg =
+          err instanceof ApiError
+            ? err.message
+            : 'Failed to update channel status.';
+        setActionError(msg);
+      }
+    },
+    [updateSyncStatus],
+  );
+
+  const handleDisconnectConfirm = useCallback(async () => {
+    if (!pendingDisconnect) return;
+    const channelId = pendingDisconnect;
+    setPendingDisconnect(null);
+    setActionError(null);
+    try {
+      await disconnectChannel(channelId);
+    } catch (err: unknown) {
+      const msg =
+        err instanceof ApiError
+          ? err.message
+          : 'Failed to disconnect channel.';
+      setActionError(msg);
+    }
+  }, [pendingDisconnect, disconnectChannel]);
 
   return (
     <section style={styles.section}>
       {banner && <CallbackBanner banner={banner} onDismiss={dismissBanner} />}
+
+      {actionError && (
+        <CallbackBanner
+          banner={{ type: 'error', message: actionError }}
+          onDismiss={() => setActionError(null)}
+        />
+      )}
 
       <div className="channels-header">
         <h1 className="channels-header__title">Channels</h1>
@@ -202,7 +342,19 @@ export default function Channels() {
       {data && !loading && !error && data.length === 0 && <EmptyChannels />}
 
       {data && !loading && !error && data.length > 0 && (
-        <ChannelTable channels={data} />
+        <ChannelTable
+          channels={data}
+          onPauseResume={(id, status) => void handlePauseResume(id, status)}
+          onDisconnect={(id) => setPendingDisconnect(id)}
+        />
+      )}
+
+      {pendingDisconnect && (
+        <ConfirmDialog
+          message="Are you sure you want to disconnect this channel? Historical data will be preserved, but syncing will stop permanently."
+          onConfirm={() => void handleDisconnectConfirm()}
+          onCancel={() => setPendingDisconnect(null)}
+        />
       )}
     </section>
   );

@@ -6,6 +6,8 @@ import type {
     TimeSeriesEntry,
     PlatformBreakdownEntry,
     TopPostEntry,
+    ContentBreakdownEntry,
+    PostingTimeEntry,
 } from './analytics.types.js';
 
 /**
@@ -234,5 +236,124 @@ export async function aggregateTopPosts(
         engagements: r.engagements,
         engagementRate: r.engagementRate,
         publishedAt: r.publishedAt.toISOString(),
+    }));
+}
+
+/**
+ * Aggregates daily time series for a single channel.
+ */
+export async function aggregateChannelTimeSeries(
+    channelId: string,
+    startUtc: Date,
+    endUtc: Date,
+): Promise<TimeSeriesEntry[]> {
+    const pipeline = [
+        {
+            $match: {
+                channelId: new mongoose.Types.ObjectId(channelId),
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $group: {
+                _id: {
+                    $dateToString: { format: '%Y-%m-%d', date: '$publishedAt', timezone: 'UTC' },
+                },
+                impressions: { $sum: '$metrics.impressions' },
+                engagements: { $sum: '$metrics.engagements' },
+                posts: { $sum: 1 },
+            },
+        },
+        { $sort: { _id: 1 as const } },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        _id: string;
+        impressions: number;
+        engagements: number;
+        posts: number;
+    }>;
+
+    return results.map((r) => ({
+        date: r._id,
+        impressions: r.impressions,
+        engagements: r.engagements,
+        posts: r.posts,
+    }));
+}
+
+/**
+ * Aggregates post counts and metrics grouped by postType for a single channel.
+ */
+export async function aggregateContentBreakdown(
+    channelId: string,
+    startUtc: Date,
+    endUtc: Date,
+): Promise<ContentBreakdownEntry[]> {
+    const pipeline = [
+        {
+            $match: {
+                channelId: new mongoose.Types.ObjectId(channelId),
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $group: {
+                _id: '$postType',
+                count: { $sum: 1 },
+                totalImpressions: { $sum: '$metrics.impressions' },
+                totalEngagements: { $sum: '$metrics.engagements' },
+            },
+        },
+        { $sort: { count: -1 as const } },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        _id: string;
+        count: number;
+        totalImpressions: number;
+        totalEngagements: number;
+    }>;
+
+    return results.map((r) => ({
+        postType: r._id,
+        count: r.count,
+        totalImpressions: r.totalImpressions,
+        totalEngagements: r.totalEngagements,
+    }));
+}
+
+/**
+ * Aggregates post frequency by hour-of-day (0-23) for a single channel.
+ */
+export async function aggregatePostingTimes(
+    channelId: string,
+    startUtc: Date,
+    endUtc: Date,
+): Promise<PostingTimeEntry[]> {
+    const pipeline = [
+        {
+            $match: {
+                channelId: new mongoose.Types.ObjectId(channelId),
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $group: {
+                _id: { $hour: '$publishedAt' },
+                count: { $sum: 1 },
+            },
+        },
+        { $sort: { _id: 1 as const } },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        _id: number;
+        count: number;
+    }>;
+
+    return results.map((r) => ({
+        hour: r._id,
+        count: r.count,
     }));
 }

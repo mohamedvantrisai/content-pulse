@@ -2,6 +2,7 @@ import { API_BASE } from './config';
 import type {
   AnalyticsOverviewResponse,
   Channel,
+  ChannelDetailAnalytics,
   ContentBrief,
   ErrorEnvelope,
   HealthStatus,
@@ -104,6 +105,32 @@ async function request<T>(
   return envelope.data;
 }
 
+/** Variant for endpoints that return 204 No Content. */
+async function requestVoid(
+  path: string,
+  options?: RequestInit,
+): Promise<void> {
+  const response = await fetch(buildUrl(path), {
+    headers: buildAuthHeaders(options?.headers),
+    ...options,
+  });
+
+  if (!response.ok) {
+    let errorBody: ErrorEnvelope | undefined;
+    try {
+      errorBody = (await response.json()) as ErrorEnvelope;
+    } catch {
+      /* response may not be JSON */
+    }
+
+    throw new ApiError(
+      errorBody?.error.code ?? `HTTP_${response.status}`,
+      errorBody?.error.message ?? response.statusText,
+      errorBody?.error.details ?? [],
+    );
+  }
+}
+
 // ── Typed endpoint methods ──
 
 /**
@@ -151,6 +178,27 @@ function getLinkedInConnectUrl(): Promise<{ url: string }> {
   return request<{ url: string }>('/channels/linkedin/connect');
 }
 
+function updateChannelSyncStatus(
+  id: string,
+  syncStatus: 'active' | 'paused',
+): Promise<Channel> {
+  return request<Channel>(`/channels/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ syncStatus }),
+  });
+}
+
+function disconnectChannel(id: string): Promise<void> {
+  return requestVoid(`/channels/${id}`, { method: 'DELETE' });
+}
+
+function getChannelDetailAnalytics(
+  id: string,
+  params: { start: string; end: string },
+): Promise<ChannelDetailAnalytics> {
+  return request<ChannelDetailAnalytics>(`/channels/${id}/analytics`, { params });
+}
+
 // ── Public client singleton ──
 
 export const apiClient = {
@@ -162,6 +210,9 @@ export const apiClient = {
   getApiKeys,
   getInstagramConnectUrl,
   getLinkedInConnectUrl,
+  updateChannelSyncStatus,
+  disconnectChannel,
+  getChannelDetailAnalytics,
 } as const;
 
 export function setApiAuthToken(token: string | null): void {

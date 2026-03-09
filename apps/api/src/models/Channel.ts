@@ -12,9 +12,10 @@ export interface IChannel {
     refreshToken?: string;
     tokenExpiresAt?: Date;
     followerCount: number;
-    syncStatus: 'active' | 'paused' | 'error' | 'pending';
+    syncStatus: 'active' | 'paused' | 'error' | 'pending' | 'inactive';
     syncErrorMessage?: string;
     lastSyncedAt?: Date;
+    disconnectedAt?: Date;
     metadata: Record<string, unknown>;
     createdAt: Date;
     updatedAt: Date;
@@ -77,7 +78,7 @@ const channelSchema = new Schema<IChannelDocument, IChannelModel>(
         syncStatus: {
             type: String,
             enum: {
-                values: ['active', 'paused', 'error', 'pending'],
+                values: ['active', 'paused', 'error', 'pending', 'inactive'],
                 message: '{VALUE} is not a valid sync status',
             },
             default: 'pending',
@@ -86,6 +87,9 @@ const channelSchema = new Schema<IChannelDocument, IChannelModel>(
             type: String,
         },
         lastSyncedAt: {
+            type: Date,
+        },
+        disconnectedAt: {
             type: Date,
         },
         metadata: {

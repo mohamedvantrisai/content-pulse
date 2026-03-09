@@ -1,10 +1,19 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
+import mongoose from 'mongoose';
 import { validate } from '../../../middleware/validate.js';
-import { authMiddleware } from '../../../middleware/auth.js';
+import { authMiddleware, optionalAuthMiddleware } from '../../../middleware/auth.js';
 import { successResponse, errorResponse } from '../../../utils/response.js';
-import { listChannelsByUser, resolveChannelsUserId, upsertChannel } from '../../../services/channels.service.js';
+import {
+    listChannelsByUser,
+    resolveChannelsUserId,
+    upsertChannel,
+    updateSyncStatus,
+    disconnectChannel,
+    getChannelDetailAnalytics,
+} from '../../../services/channels.service.js';
+import { strictIsoDate } from '../../../utils/date-validation.js';
 import {
     buildAuthUrl as buildInstagramAuthUrl,
     exchangeCodeForToken as exchangeInstagramCode,
@@ -97,6 +106,15 @@ function validateStateCookie(
     return decoded;
 }
 
+// ─── Shared param schemas ────────────────────────────────────
+
+const channelIdParam = z.object({
+    id: z.string().refine(
+        (v) => mongoose.Types.ObjectId.isValid(v),
+        'Invalid channel ID',
+    ),
+});
+
 // ─── List channels ──────────────────────────────────────────
 
 const listChannelsSchema = z.object({
@@ -107,11 +125,85 @@ const listChannelsSchema = z.object({
     params: z.unknown(),
 });
 
-router.get('/', validate(listChannelsSchema), async (req, res, next) => {
+router.get('/', optionalAuthMiddleware, validate(listChannelsSchema), async (req, res, next) => {
     try {
         const userId = await resolveChannelsUserId(req.user?.id);
         const data = await listChannelsByUser(userId);
         res.json(successResponse(data));
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ─── Update sync status (pause / resume) ────────────────────
+
+const patchChannelSchema = z.object({
+    params: channelIdParam,
+    body: z.object({
+        syncStatus: z.enum(['active', 'paused']),
+    }),
+    query: z.unknown(),
+});
+
+router.patch('/:id', authMiddleware, validate(patchChannelSchema), async (req, res, next) => {
+    try {
+        const channelId = req.params['id'] as string;
+        const channel = await updateSyncStatus(
+            req.user!.id,
+            channelId,
+            req.body.syncStatus as 'active' | 'paused',
+        );
+        res.json(successResponse(channel));
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ─── Disconnect channel (soft delete) ───────────────────────
+
+const deleteChannelSchema = z.object({
+    params: channelIdParam,
+    body: z.unknown(),
+    query: z.unknown(),
+});
+
+router.delete('/:id', authMiddleware, validate(deleteChannelSchema), async (req, res, next) => {
+    try {
+        const channelId = req.params['id'] as string;
+        await disconnectChannel(req.user!.id, channelId);
+        res.status(204).end();
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ─── Channel detail analytics ───────────────────────────────
+
+const channelAnalyticsSchema = z.object({
+    params: channelIdParam,
+    query: z
+        .object({
+            start: strictIsoDate('start is required'),
+            end: strictIsoDate('end is required'),
+        })
+        .refine((q) => q.end >= q.start, {
+            message: 'end must be greater than or equal to start',
+            path: ['end'],
+        }),
+    body: z.unknown(),
+});
+
+router.get('/:id/analytics', authMiddleware, validate(channelAnalyticsSchema), async (req, res, next) => {
+    try {
+        const channelId = req.params['id'] as string;
+        const { start, end } = req.query as { start: string; end: string };
+        const data = await getChannelDetailAnalytics(
+            req.user!.id,
+            channelId,
+            start,
+            end,
+        );
+        res.json(successResponse(data, { dateRange: `${start}/${end}` }));
     } catch (err) {
         next(err);
     }

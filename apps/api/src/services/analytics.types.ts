@@ -47,3 +47,31 @@ export interface AnalyticsOverviewResponse {
     platformBreakdown: PlatformBreakdownEntry[];
     topPosts: TopPostEntry[];
 }
+
+export interface ContentBreakdownEntry {
+    postType: string;
+    count: number;
+    totalImpressions: number;
+    totalEngagements: number;
+}
+
+export interface PostingTimeEntry {
+    hour: number;
+    count: number;
+}
+
+export interface ChannelDetailAnalyticsResponse {
+    channel: {
+        id: string;
+        platform: string;
+        displayName: string;
+        handle: string;
+        followerCount: number;
+        syncStatus: string;
+        lastSyncedAt: Date | null;
+        createdAt: Date;
+    };
+    timeSeries: TimeSeriesEntry[];
+    contentBreakdown: ContentBreakdownEntry[];
+    postingTimes: PostingTimeEntry[];
+}
