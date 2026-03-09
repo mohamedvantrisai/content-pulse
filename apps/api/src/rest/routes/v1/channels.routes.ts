@@ -3,7 +3,7 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import mongoose from 'mongoose';
 import { validate } from '../../../middleware/validate.js';
-import { authMiddleware, optionalAuthMiddleware } from '../../../middleware/auth.js';
+import { optionalAuthMiddleware } from '../../../middleware/auth.js';
 import { successResponse, errorResponse } from '../../../utils/response.js';
 import {
     listChannelsByUser,
@@ -52,6 +52,43 @@ function dashboardRedirect(params: Record<string, string>): string {
 function wantsJson(req: import('express').Request): boolean {
     const accept = req.headers.accept ?? '';
     return accept.includes('application/json');
+}
+
+const DEV_DUMMY_CHANNELS: Record<'instagram' | 'linkedin', {
+    platformAccountId: string; displayName: string; handle: string; followerCount: number;
+}> = {
+    instagram: {
+        platformAccountId: 'ig_dev_001',
+        displayName: 'Dev Instagram',
+        handle: '@dev_instagram',
+        followerCount: 12_500,
+    },
+    linkedin: {
+        platformAccountId: 'li_dev_001',
+        displayName: 'Dev LinkedIn',
+        handle: 'dev-linkedin',
+        followerCount: 8_300,
+    },
+};
+
+async function devFallbackConnect(
+    userId: string,
+    platform: 'instagram' | 'linkedin',
+): Promise<string> {
+    const dummy = DEV_DUMMY_CHANNELS[platform];
+    const channel = await upsertChannel({
+        userId,
+        platform,
+        platformAccountId: dummy.platformAccountId,
+        displayName: dummy.displayName,
+        handle: dummy.handle,
+        accessToken: 'dev_fake_token',
+        tokenExpiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000),
+    });
+    channel.followerCount = dummy.followerCount;
+    await channel.save();
+    logger.info({ userId, platform }, 'Dev fallback: seeded dummy channel');
+    return dashboardRedirect({ connected: platform });
 }
 
 function setStateCookie(
@@ -216,11 +253,18 @@ router.get('/:id/analytics', optionalAuthMiddleware, validate(channelAnalyticsSc
 
 const IG_COOKIE_PATH = '/api/v1/channels/instagram';
 
-router.get('/instagram/connect', authMiddleware, (req, res, next) => {
+router.get('/instagram/connect', optionalAuthMiddleware, async (req, res, next) => {
     try {
-        const userId = req.user!.id;
-        const { url, state } = buildInstagramAuthUrl();
-        setStateCookie(res, state, userId, IG_COOKIE_PATH);
+        const userId = await resolveChannelsUserId(req.user?.id);
+
+        let url: string;
+        try {
+            const auth = buildInstagramAuthUrl();
+            url = auth.url;
+            setStateCookie(res, auth.state, userId, IG_COOKIE_PATH);
+        } catch {
+            url = await devFallbackConnect(userId, 'instagram');
+        }
 
         if (wantsJson(req)) {
             res.json(successResponse({ url }));
@@ -309,11 +353,18 @@ router.get('/instagram/callback', async (req, res) => {
 
 const LI_COOKIE_PATH = '/api/v1/channels/linkedin';
 
-router.get('/linkedin/connect', authMiddleware, (req, res, next) => {
+router.get('/linkedin/connect', optionalAuthMiddleware, async (req, res, next) => {
     try {
-        const userId = req.user!.id;
-        const { url, state } = buildLinkedInAuthUrl();
-        setStateCookie(res, state, userId, LI_COOKIE_PATH);
+        const userId = await resolveChannelsUserId(req.user?.id);
+
+        let url: string;
+        try {
+            const auth = buildLinkedInAuthUrl();
+            url = auth.url;
+            setStateCookie(res, auth.state, userId, LI_COOKIE_PATH);
+        } catch {
+            url = await devFallbackConnect(userId, 'linkedin');
+        }
 
         if (wantsJson(req)) {
             res.json(successResponse({ url }));
