@@ -193,12 +193,13 @@ const channelAnalyticsSchema = z.object({
     body: z.unknown(),
 });
 
-router.get('/:id/analytics', authMiddleware, validate(channelAnalyticsSchema), async (req, res, next) => {
+router.get('/:id/analytics', optionalAuthMiddleware, validate(channelAnalyticsSchema), async (req, res, next) => {
     try {
+        const userId = await resolveChannelsUserId(req.user?.id);
         const channelId = req.params['id'] as string;
         const { start, end } = req.query as { start: string; end: string };
         const data = await getChannelDetailAnalytics(
-            req.user!.id,
+            userId,
             channelId,
             start,
             end,
