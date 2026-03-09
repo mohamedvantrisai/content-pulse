@@ -145,11 +145,12 @@ const patchChannelSchema = z.object({
     query: z.unknown(),
 });
 
-router.patch('/:id', authMiddleware, validate(patchChannelSchema), async (req, res, next) => {
+router.patch('/:id', optionalAuthMiddleware, validate(patchChannelSchema), async (req, res, next) => {
     try {
+        const userId = await resolveChannelsUserId(req.user?.id);
         const channelId = req.params['id'] as string;
         const channel = await updateSyncStatus(
-            req.user!.id,
+            userId,
             channelId,
             req.body.syncStatus as 'active' | 'paused',
         );
@@ -167,10 +168,11 @@ const deleteChannelSchema = z.object({
     query: z.unknown(),
 });
 
-router.delete('/:id', authMiddleware, validate(deleteChannelSchema), async (req, res, next) => {
+router.delete('/:id', optionalAuthMiddleware, validate(deleteChannelSchema), async (req, res, next) => {
     try {
+        const userId = await resolveChannelsUserId(req.user?.id);
         const channelId = req.params['id'] as string;
-        await disconnectChannel(req.user!.id, channelId);
+        await disconnectChannel(userId, channelId);
         res.status(204).end();
     } catch (err) {
         next(err);
