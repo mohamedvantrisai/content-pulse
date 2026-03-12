@@ -8,6 +8,9 @@ import type {
     TopPostEntry,
     ContentBreakdownEntry,
     PostingTimeEntry,
+    ContentTypePerformanceEntry,
+    BestPostingTimeEntry,
+    ComparisonChannelMetrics,
 } from './analytics.types.js';
 
 /**
@@ -356,4 +359,307 @@ export async function aggregatePostingTimes(
         hour: r._id,
         count: r.count,
     }));
+}
+
+
+
+// ── US-301: Weekly Time Series ────────────────────────────────
+
+/**
+ * Aggregates time series into ISO-week buckets (Monday–Sunday).
+ * Each entry's date is the Monday of that week (YYYY-MM-DD).
+ */
+export async function aggregateChannelTimeSeriesWeekly(
+    channelId: string,
+    startUtc: Date,
+    endUtc: Date,
+): Promise<TimeSeriesEntry[]> {
+    const pipeline = [
+        {
+            $match: {
+                channelId: new mongoose.Types.ObjectId(channelId),
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $addFields: {
+                // Compute ISO Monday: subtract (dayOfWeek - 2) days, where Mongo Sun=1..Sat=7
+                isoMonday: {
+                    $dateSubtract: {
+                        startDate: '$publishedAt',
+                        unit: 'day',
+                        amount: {
+                            $mod: [
+                                { $add: [{ $subtract: [{ $dayOfWeek: '$publishedAt' }, 2] }, 7] },
+                                7,
+                            ],
+                        },
+                    },
+                },
+            },
+        },
+        {
+            $group: {
+                _id: { $dateToString: { format: '%Y-%m-%d', date: '$isoMonday', timezone: 'UTC' } },
+                impressions: { $sum: '$metrics.impressions' },
+                engagements: { $sum: '$metrics.engagements' },
+                posts: { $sum: 1 },
+            },
+        },
+        { $sort: { _id: 1 as const } },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        _id: string;
+        impressions: number;
+        engagements: number;
+        posts: number;
+    }>;
+
+    return results.map((r) => ({
+        date: r._id,
+        impressions: r.impressions,
+        engagements: r.engagements,
+        posts: r.posts,
+    }));
+}
+
+// ── US-301: Monthly Time Series ───────────────────────────────
+
+/**
+ * Aggregates time series into calendar-month buckets.
+ * Each entry's date is the first day of that month (YYYY-MM-01).
+ */
+export async function aggregateChannelTimeSeriesMonthly(
+    channelId: string,
+    startUtc: Date,
+    endUtc: Date,
+): Promise<TimeSeriesEntry[]> {
+    const pipeline = [
+        {
+            $match: {
+                channelId: new mongoose.Types.ObjectId(channelId),
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $group: {
+                _id: {
+                    $dateToString: { format: '%Y-%m-01', date: '$publishedAt', timezone: 'UTC' },
+                },
+                impressions: { $sum: '$metrics.impressions' },
+                engagements: { $sum: '$metrics.engagements' },
+                posts: { $sum: 1 },
+            },
+        },
+        { $sort: { _id: 1 as const } },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        _id: string;
+        impressions: number;
+        engagements: number;
+        posts: number;
+    }>;
+
+    return results.map((r) => ({
+        date: r._id,
+        impressions: r.impressions,
+        engagements: r.engagements,
+        posts: r.posts,
+    }));
+}
+
+// ── US-302: Content Type Performance Breakdown ────────────────
+
+/**
+ * Aggregates content type performance with avg metrics, sorted by avgEngagementRate desc.
+ * Types with 0 posts are excluded by the $match stage.
+ */
+export async function aggregateContentTypePerformance(
+    channelId: string,
+    startUtc: Date,
+    endUtc: Date,
+): Promise<ContentTypePerformanceEntry[]> {
+    const pipeline = [
+        {
+            $match: {
+                channelId: new mongoose.Types.ObjectId(channelId),
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $group: {
+                _id: '$postType',
+                postCount: { $sum: 1 },
+                totalImpressions: { $sum: '$metrics.impressions' },
+                totalEngagements: { $sum: '$metrics.engagements' },
+            },
+        },
+        {
+            $addFields: {
+                avgImpressions: { $round: [{ $divide: ['$totalImpressions', '$postCount'] }, 2] },
+                avgEngagements: { $round: [{ $divide: ['$totalEngagements', '$postCount'] }, 2] },
+                avgEngagementRate: {
+                    $cond: {
+                        if: { $gt: ['$totalImpressions', 0] },
+                        then: {
+                            $round: [
+                                { $divide: ['$totalEngagements', '$totalImpressions'] },
+                                6,
+                            ],
+                        },
+                        else: 0,
+                    },
+                },
+            },
+        },
+        { $sort: { avgEngagementRate: -1 as const } },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        _id: string;
+        postCount: number;
+        avgImpressions: number;
+        avgEngagements: number;
+        avgEngagementRate: number;
+    }>;
+
+    return results.map((r) => ({
+        postType: r._id,
+        postCount: r.postCount,
+        avgImpressions: r.avgImpressions,
+        avgEngagements: r.avgEngagements,
+        avgEngagementRate: r.avgEngagementRate,
+    }));
+}
+
+// ── US-303: Best Posting Times ────────────────────────────────
+
+/**
+ * Aggregates day-of-week × hour slots with avgEngagementRate.
+ * Slots with < minPosts are excluded. Returns top N sorted by rate desc.
+ */
+export async function aggregateBestPostingTimes(
+    channelId: string,
+    startUtc: Date,
+    endUtc: Date,
+    minPosts: number = 2,
+    topN: number = 5,
+): Promise<BestPostingTimeEntry[]> {
+    const pipeline = [
+        {
+            $match: {
+                channelId: new mongoose.Types.ObjectId(channelId),
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $group: {
+                _id: {
+                    // MongoDB $dayOfWeek: Sun=1..Sat=7 → convert to 0-6 (Sun=0)
+                    dayOfWeek: { $subtract: [{ $dayOfWeek: '$publishedAt' }, 1] },
+                    hour: { $hour: '$publishedAt' },
+                },
+                postCount: { $sum: 1 },
+                totalImpressions: { $sum: '$metrics.impressions' },
+                totalEngagements: { $sum: '$metrics.engagements' },
+            },
+        },
+        {
+            $match: {
+                postCount: { $gte: minPosts },
+            },
+        },
+        {
+            $addFields: {
+                avgEngagementRate: {
+                    $cond: {
+                        if: { $gt: ['$totalImpressions', 0] },
+                        then: {
+                            $round: [
+                                { $divide: ['$totalEngagements', '$totalImpressions'] },
+                                6,
+                            ],
+                        },
+                        else: 0,
+                    },
+                },
+            },
+        },
+        { $sort: { avgEngagementRate: -1 as const } },
+        { $limit: topN },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        _id: { dayOfWeek: number; hour: number };
+        postCount: number;
+        avgEngagementRate: number;
+    }>;
+
+    return results.map((r) => ({
+        dayOfWeek: r._id.dayOfWeek,
+        hour: r._id.hour,
+        avgEngagementRate: r.avgEngagementRate,
+        postCount: r.postCount,
+    }));
+}
+
+// ── US-304: Channel Comparison Metrics ────────────────────────
+
+/**
+ * Aggregates total metrics for a specific channel within a date range.
+ */
+export async function aggregateChannelComparisonMetrics(
+    channelId: string,
+    userId: string,
+    startUtc: Date,
+    endUtc: Date,
+): Promise<{
+    totalImpressions: number;
+    totalEngagements: number;
+    totalPosts: number;
+    avgEngagementRate: number;
+} | null> {
+    const channelOid = new mongoose.Types.ObjectId(channelId);
+    const userOid = new mongoose.Types.ObjectId(userId);
+
+    const pipeline = [
+        {
+            $match: {
+                channelId: channelOid,
+                userId: userOid,
+                publishedAt: { $gte: startUtc, $lte: endUtc },
+            },
+        },
+        {
+            $group: {
+                _id: null,
+                totalImpressions: { $sum: '$metrics.impressions' },
+                totalEngagements: { $sum: '$metrics.engagements' },
+                totalPosts: { $sum: 1 },
+            },
+        },
+    ];
+
+    const results = await Post.aggregate(pipeline) as Array<{
+        totalImpressions: number;
+        totalEngagements: number;
+        totalPosts: number;
+    }>;
+
+    const row = results[0];
+    if (!row) return null;
+
+    const avgEngagementRate =
+        row.totalImpressions > 0
+            ? parseFloat((row.totalEngagements / row.totalImpressions).toFixed(6))
+            : 0;
+
+    return {
+        totalImpressions: row.totalImpressions,
+        totalEngagements: row.totalEngagements,
+        totalPosts: row.totalPosts,
+        avgEngagementRate,
+    };
 }

@@ -1,16 +1,31 @@
 import { logger } from '../lib/logger.js';
 import { Post } from '../models/Post.js';
+import { Channel } from '../models/Channel.js';
+import mongoose from 'mongoose';
 import type {
     AnalyticsOverviewResponse,
     ChangeMetrics,
     PeriodMetrics,
     TimeSeriesEntry,
+    Granularity,
+    ChannelTimeSeriesResponse,
+    ContentTypeBreakdownResponse,
+    BestPostingTimesResponse,
+    ChannelComparisonResponse,
+    ComparisonChannelMetrics,
+    ComparisonWinners,
 } from './analytics.types.js';
 import {
     aggregatePeriodMetrics,
     aggregateTimeSeries,
     aggregatePlatformBreakdown,
     aggregateTopPosts,
+    aggregateChannelTimeSeries,
+    aggregateChannelTimeSeriesWeekly,
+    aggregateChannelTimeSeriesMonthly,
+    aggregateContentTypePerformance,
+    aggregateBestPostingTimes,
+    aggregateChannelComparisonMetrics,
 } from './analytics.repository.js';
 
 const FALLBACK_USER_ID = '000000000000000000000000';
@@ -129,4 +144,198 @@ export async function getOverview(
         platformBreakdown,
         topPosts,
     };
+}
+
+
+
+// ── US-301: Per-Channel Time Series with Granularity ──────────
+
+function channelNotFoundError(): Error & { statusCode: number; code: string } {
+    const error = new Error('Channel not found') as Error & { statusCode: number; code: string };
+    error.statusCode = 404;
+    error.code = 'NOT_FOUND';
+    return error;
+}
+
+/**
+ * Returns time series for a specific channel at the requested granularity.
+ * Validates channel ownership before returning data.
+ */
+export async function getChannelTimeSeries(
+    userId: string,
+    channelId: string,
+    start: string,
+    end: string,
+    granularity: Granularity = 'daily',
+): Promise<ChannelTimeSeriesResponse> {
+    if (!mongoose.Types.ObjectId.isValid(channelId)) throw channelNotFoundError();
+
+    const channel = await Channel.findOne({
+        _id: new mongoose.Types.ObjectId(channelId),
+        userId: new mongoose.Types.ObjectId(userId),
+    });
+    if (!channel) throw channelNotFoundError();
+
+    const startUtc = new Date(start + 'T00:00:00.000Z');
+    const endUtc = new Date(end + 'T23:59:59.999Z');
+
+    let timeSeries: TimeSeriesEntry[];
+
+    switch (granularity) {
+        case 'weekly':
+            timeSeries = await aggregateChannelTimeSeriesWeekly(channelId, startUtc, endUtc);
+            break;
+        case 'monthly':
+            timeSeries = await aggregateChannelTimeSeriesMonthly(channelId, startUtc, endUtc);
+            break;
+        case 'daily':
+        default:
+            timeSeries = await aggregateChannelTimeSeries(channelId, startUtc, endUtc);
+            timeSeries = fillTimeSeriesGaps(timeSeries, start, end);
+            break;
+    }
+
+    return { channelId, granularity, timeSeries };
+}
+
+// ── US-302: Content Type Performance Breakdown ────────────────
+
+/**
+ * Returns content type performance breakdown for a specific channel.
+ * Sorted by avgEngagementRate descending. Types with 0 posts excluded.
+ */
+export async function getContentTypeBreakdown(
+    userId: string,
+    channelId: string,
+    start: string,
+    end: string,
+): Promise<ContentTypeBreakdownResponse> {
+    if (!mongoose.Types.ObjectId.isValid(channelId)) throw channelNotFoundError();
+
+    const channel = await Channel.findOne({
+        _id: new mongoose.Types.ObjectId(channelId),
+        userId: new mongoose.Types.ObjectId(userId),
+    });
+    if (!channel) throw channelNotFoundError();
+
+    const startUtc = new Date(start + 'T00:00:00.000Z');
+    const endUtc = new Date(end + 'T23:59:59.999Z');
+
+    const contentTypeBreakdown = await aggregateContentTypePerformance(channelId, startUtc, endUtc);
+
+    return { channelId, contentTypeBreakdown };
+}
+
+// ── US-303: Best Posting Times ────────────────────────────────
+
+/**
+ * Returns the top 5 posting time slots (dayOfWeek × hour) by avgEngagementRate.
+ * Slots with fewer than 2 posts are excluded.
+ */
+export async function getBestPostingTimes(
+    userId: string,
+    channelId: string,
+    start: string,
+    end: string,
+): Promise<BestPostingTimesResponse> {
+    if (!mongoose.Types.ObjectId.isValid(channelId)) throw channelNotFoundError();
+
+    const channel = await Channel.findOne({
+        _id: new mongoose.Types.ObjectId(channelId),
+        userId: new mongoose.Types.ObjectId(userId),
+    });
+    if (!channel) throw channelNotFoundError();
+
+    const startUtc = new Date(start + 'T00:00:00.000Z');
+    const endUtc = new Date(end + 'T23:59:59.999Z');
+
+    const bestPostingTimes = await aggregateBestPostingTimes(channelId, startUtc, endUtc, 2, 5);
+
+    return { channelId, bestPostingTimes };
+}
+
+// ── US-304: Channel Comparison ────────────────────────────────
+
+function validationError(message: string): Error & { statusCode: number; code: string } {
+    const error = new Error(message) as Error & { statusCode: number; code: string };
+    error.statusCode = 400;
+    error.code = 'VALIDATION_ERROR';
+    return error;
+}
+
+function forbiddenError(message: string): Error & { statusCode: number; code: string } {
+    const error = new Error(message) as Error & { statusCode: number; code: string };
+    error.statusCode = 403;
+    error.code = 'FORBIDDEN';
+    return error;
+}
+
+/**
+ * Compares analytics for 2+ channels side-by-side.
+ * Returns per-channel metrics and a winners object.
+ */
+export async function compareChannels(
+    userId: string,
+    channelIds: string[],
+    start: string,
+    end: string,
+): Promise<ChannelComparisonResponse> {
+    if (channelIds.length < 2) {
+        throw validationError('At least 2 channel IDs required');
+    }
+
+    const startUtc = new Date(start + 'T00:00:00.000Z');
+    const endUtc = new Date(end + 'T23:59:59.999Z');
+
+    // Validate all channels exist and belong to user
+    const channels: ComparisonChannelMetrics[] = [];
+    for (const cid of channelIds) {
+        if (!mongoose.Types.ObjectId.isValid(cid)) throw channelNotFoundError();
+
+        const channel = await Channel.findOne({
+            _id: new mongoose.Types.ObjectId(cid),
+        });
+
+        if (!channel) throw channelNotFoundError();
+
+        // Check ownership
+        if (String(channel.userId) !== userId) {
+            throw forbiddenError('Channel does not belong to the authenticated user');
+        }
+
+        const metrics = await aggregateChannelComparisonMetrics(cid, userId, startUtc, endUtc);
+
+        channels.push({
+            channelId: cid,
+            platform: channel.platform,
+            displayName: channel.displayName,
+            totalImpressions: metrics?.totalImpressions ?? 0,
+            totalEngagements: metrics?.totalEngagements ?? 0,
+            totalPosts: metrics?.totalPosts ?? 0,
+            avgEngagementRate: metrics?.avgEngagementRate ?? 0,
+        });
+    }
+
+    // Determine winners
+    const winners: ComparisonWinners = {
+        totalImpressions: findWinner(channels, 'totalImpressions'),
+        totalEngagements: findWinner(channels, 'totalEngagements'),
+        avgEngagementRate: findWinner(channels, 'avgEngagementRate'),
+        totalPosts: findWinner(channels, 'totalPosts'),
+    };
+
+    return { channels, winners };
+}
+
+function findWinner(
+    channels: ComparisonChannelMetrics[],
+    metric: keyof Pick<ComparisonChannelMetrics, 'totalImpressions' | 'totalEngagements' | 'avgEngagementRate' | 'totalPosts'>,
+): string {
+    let best = channels[0]!;
+    for (let i = 1; i < channels.length; i++) {
+        if (channels[i]![metric] > best[metric]) {
+            best = channels[i]!;
+        }
+    }
+    return best.channelId;
 }

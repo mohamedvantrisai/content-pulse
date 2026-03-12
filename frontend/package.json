@@ -1,0 +1,8 @@
+{
+  "name": "contentpulse-frontend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "start": "cd /app/apps/dashboard && npx vite --host 0.0.0.0 --port 3000"
+  }
+}
