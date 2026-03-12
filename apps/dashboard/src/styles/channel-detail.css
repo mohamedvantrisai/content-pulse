@@ -115,6 +115,44 @@
 .cd-controls {
     display: flex;
     justify-content: flex-end;
+    gap: var(--space-3);
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+/* ── Granularity Selector ── */
+
+.cd-granularity {
+    display: flex;
+    gap: 2px;
+    background-color: var(--color-bg);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 2px;
+}
+
+.cd-granularity__btn {
+    appearance: none;
+    border: none;
+    background-color: transparent;
+    border-radius: calc(var(--radius-md) - 2px);
+    padding: var(--space-1) var(--space-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+}
+
+.cd-granularity__btn:hover {
+    color: var(--color-text);
+}
+
+.cd-granularity__btn--active {
+    background-color: var(--color-surface);
+    color: var(--color-text);
+    box-shadow: var(--shadow-sm);
 }
 
 /* ── Grid ── */
@@ -141,7 +179,21 @@
     color: var(--color-text-secondary);
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    margin: 0 0 var(--space-2);
+}
+
+.cd-widget__subtitle {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
     margin: 0 0 var(--space-4);
+    opacity: 0.7;
+}
+
+.cd-widget__empty {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    text-align: center;
+    padding: var(--space-6) 0;
 }
 
 /* ── Posting times histogram ── */
@@ -177,6 +229,150 @@
     font-size: 0.5625rem;
     color: var(--color-text-secondary);
     white-space: nowrap;
+}
+
+/* ── US-302: Content Type Performance Table ── */
+
+.cd-perf-table {
+    margin-bottom: var(--space-4);
+}
+
+.cd-perf-table__header,
+.cd-perf-table__row {
+    display: grid;
+    grid-template-columns: 1.5fr 0.7fr 1fr 1fr 1fr;
+    gap: var(--space-3);
+    align-items: center;
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.8125rem;
+}
+
+.cd-perf-table__header {
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.cd-perf-table__row {
+    color: var(--color-text);
+    border-bottom: 1px solid var(--color-border);
+    transition: background-color 0.1s;
+}
+
+.cd-perf-table__row:last-child {
+    border-bottom: none;
+}
+
+.cd-perf-table__row:hover {
+    background-color: var(--color-bg);
+}
+
+.cd-perf-table__type {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 500;
+    text-transform: capitalize;
+}
+
+.cd-perf-table__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cd-perf-table__rate {
+    font-weight: 600;
+    font-family: var(--font-mono);
+    color: var(--color-primary);
+}
+
+/* ── US-303: Best Posting Time Slots ── */
+
+.cd-posting-slots {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.cd-posting-slot {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    transition: border-color 0.15s;
+}
+
+.cd-posting-slot:hover {
+    border-color: var(--color-primary);
+}
+
+.cd-posting-slot__bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background-color: var(--color-primary);
+    opacity: 0.06;
+    transition: width 0.4s ease;
+    pointer-events: none;
+}
+
+.cd-posting-slot__rank {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    width: 28px;
+    text-align: center;
+    flex-shrink: 0;
+    z-index: 1;
+}
+
+.cd-posting-slot__info {
+    display: flex;
+    gap: var(--space-2);
+    align-items: center;
+    min-width: 100px;
+    z-index: 1;
+}
+
+.cd-posting-slot__day {
+    font-weight: 600;
+    font-size: 0.875rem;
+    color: var(--color-text);
+}
+
+.cd-posting-slot__hour {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+}
+
+.cd-posting-slot__metrics {
+    display: flex;
+    gap: var(--space-3);
+    align-items: center;
+    margin-left: auto;
+    z-index: 1;
+}
+
+.cd-posting-slot__rate {
+    font-weight: 700;
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    color: var(--color-primary);
+}
+
+.cd-posting-slot__count {
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
 }
 
 /* ── Responsive ── */

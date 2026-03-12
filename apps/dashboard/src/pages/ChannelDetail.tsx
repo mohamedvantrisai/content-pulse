@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   AreaChart,
@@ -13,20 +13,14 @@ import {
   Cell,
 } from 'recharts';
 import { useChannelDetail } from '@/hooks/useChannelDetail';
+import { apiClient, ApiError } from '@/api/client';
 import DateRangeSelector from '@/components/DateRangeSelector';
 import WidgetSkeleton from '@/components/states/WidgetSkeleton';
 import ErrorState from '@/components/states/ErrorState';
 import EmptyState from '@/components/states/EmptyState';
 import { formatNumber } from '@/utils/formatting';
-import { aggregateWeekly, type WeeklyTimeSeriesEntry } from '@/utils/aggregation';
-import { WEEKLY_AGGREGATION_THRESHOLD } from '@/constants/dateRanges';
-import type { TimeSeriesEntry, ContentBreakdownEntry, PostingTimeEntry, Platform, SyncStatus } from '@/types';
+import type { Platform, SyncStatus } from '@/types';
 import '@/styles/channel-detail.css';
-
-const PLATFORM_ICONS: Record<Platform, string> = {
-  instagram: '📸',
-  linkedin: '💼',
-};
 
 const CHART_COLORS = {
   impressions: '#3b82f6',
@@ -40,6 +34,8 @@ const CONTENT_TYPE_COLORS: Record<string, string> = {
   text: '#6b7280',
   link: '#06b6d4',
 };
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 function getContentColor(postType: string): string {
   return CONTENT_TYPE_COLORS[postType] ?? '#6b7280';
@@ -69,18 +65,19 @@ function ChannelHeader({
   onBack: () => void;
 }) {
   return (
-    <div className="cd-header">
+    <div className="cd-header" data-testid="channel-detail-header">
       <button
         type="button"
         className="cd-header__back"
         onClick={onBack}
         aria-label="Back to channels"
+        data-testid="back-to-channels-btn"
       >
         ← Back
       </button>
       <div className="cd-header__info">
         <span className="cd-header__icon" aria-hidden="true">
-          {PLATFORM_ICONS[platform]}
+          {platform === 'instagram' ? '📸' : '💼'}
         </span>
         <div className="cd-header__text">
           <h1 className="cd-header__name">{displayName}</h1>
@@ -104,50 +101,67 @@ function ChannelHeader({
   );
 }
 
-// ── Time Series Chart ──
+// ── Granularity Selector ──
 
-interface ChartDataPoint {
-  label: string;
-  impressions: number;
-  engagements: number;
+type Granularity = 'daily' | 'weekly' | 'monthly';
+
+function GranularitySelector({
+  selected,
+  onSelect,
+}: {
+  selected: Granularity;
+  onSelect: (g: Granularity) => void;
+}) {
+  const options: Granularity[] = ['daily', 'weekly', 'monthly'];
+  return (
+    <div className="cd-granularity" data-testid="granularity-selector">
+      {options.map((g) => (
+        <button
+          key={g}
+          type="button"
+          className={`cd-granularity__btn ${selected === g ? 'cd-granularity__btn--active' : ''}`}
+          onClick={() => onSelect(g)}
+          data-testid={`granularity-${g}-btn`}
+        >
+          {g.charAt(0).toUpperCase() + g.slice(1)}
+        </button>
+      ))}
+    </div>
+  );
 }
 
-function TimeSeriesChart({ timeSeries }: { timeSeries: TimeSeriesEntry[] }) {
-  const { chartData, isWeekly } = useMemo(() => {
-    if (timeSeries.length > WEEKLY_AGGREGATION_THRESHOLD) {
-      const weekly = aggregateWeekly(timeSeries);
-      return {
-        chartData: weekly.map(
-          (w: WeeklyTimeSeriesEntry): ChartDataPoint => ({
-            label: w.weekLabel,
-            impressions: w.impressions,
-            engagements: w.engagements,
-          }),
-        ),
-        isWeekly: true,
-      };
-    }
-    return {
-      chartData: timeSeries.map(
-        (d): ChartDataPoint => ({
-          label: d.date,
-          impressions: d.impressions,
-          engagements: d.engagements,
-        }),
-      ),
-      isWeekly: false,
-    };
-  }, [timeSeries]);
+// ── US-301: Time Series Chart with Granularity ──
 
-  if (chartData.length === 0) return null;
+interface TimeSeriesEntry {
+  date: string;
+  impressions: number;
+  engagements: number;
+  posts: number;
+}
+
+function TimeSeriesChart({
+  timeSeries,
+  granularity,
+}: {
+  timeSeries: TimeSeriesEntry[];
+  granularity: Granularity;
+}) {
+  if (timeSeries.length === 0) return null;
+
+  const labelMap: Record<Granularity, string> = {
+    daily: 'Daily Trends',
+    weekly: 'Weekly Trends',
+    monthly: 'Monthly Trends',
+  };
 
   return (
-    <div className="cd-widget" role="img" aria-label="Impressions and engagements over time">
-      <h2 className="cd-widget__title">
-        {isWeekly ? 'Weekly Trends' : 'Daily Trends'}
-      </h2>
+    <div className="cd-widget" data-testid="time-series-chart" role="img" aria-label="Impressions and engagements over time">
+      <h2 className="cd-widget__title">{labelMap[granularity]}</h2>
+      <div className="cd-widget__subtitle">
+        {timeSeries.length} data points
+      </div>
       <ResponsiveContainer width="100%" height={300}>
-        <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+        <AreaChart data={timeSeries} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="cdGradImpressions" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor={CHART_COLORS.impressions} stopOpacity={0.2} />
@@ -160,7 +174,7 @@ function TimeSeriesChart({ timeSeries }: { timeSeries: TimeSeriesEntry[] }) {
           </defs>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" vertical={false} />
           <XAxis
-            dataKey="label"
+            dataKey="date"
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             tickLine={false}
             axisLine={false}
@@ -180,6 +194,7 @@ function TimeSeriesChart({ timeSeries }: { timeSeries: TimeSeriesEntry[] }) {
               borderRadius: 'var(--radius-md)',
               fontSize: '0.8125rem',
             }}
+            formatter={(value: number) => formatNumber(value)}
           />
           <Area
             type="monotone"
@@ -207,15 +222,48 @@ function TimeSeriesChart({ timeSeries }: { timeSeries: TimeSeriesEntry[] }) {
   );
 }
 
-// ── Content Breakdown ──
+// ── US-302: Content Type Performance Breakdown ──
 
-function ContentBreakdown({ data }: { data: ContentBreakdownEntry[] }) {
+interface ContentTypePerformance {
+  postType: string;
+  postCount: number;
+  avgImpressions: number;
+  avgEngagements: number;
+  avgEngagementRate: number;
+}
+
+function ContentTypeBreakdown({ data }: { data: ContentTypePerformance[] }) {
   if (data.length === 0) return null;
 
   return (
-    <div className="cd-widget">
-      <h2 className="cd-widget__title">Content Breakdown</h2>
-      <ResponsiveContainer width="100%" height={Math.max(200, data.length * 50)}>
+    <div className="cd-widget" data-testid="content-type-breakdown">
+      <h2 className="cd-widget__title">Content Type Performance</h2>
+      <div className="cd-widget__subtitle">Sorted by engagement rate (highest first)</div>
+      <div className="cd-perf-table">
+        <div className="cd-perf-table__header">
+          <span>Type</span>
+          <span>Posts</span>
+          <span>Avg Impressions</span>
+          <span>Avg Engagements</span>
+          <span>Eng. Rate</span>
+        </div>
+        {data.map((entry) => (
+          <div key={entry.postType} className="cd-perf-table__row" data-testid={`content-type-${entry.postType}`}>
+            <span className="cd-perf-table__type">
+              <span
+                className="cd-perf-table__dot"
+                style={{ backgroundColor: getContentColor(entry.postType) }}
+              />
+              {entry.postType}
+            </span>
+            <span>{entry.postCount}</span>
+            <span>{formatNumber(entry.avgImpressions)}</span>
+            <span>{formatNumber(entry.avgEngagements)}</span>
+            <span className="cd-perf-table__rate">{(entry.avgEngagementRate * 100).toFixed(2)}%</span>
+          </div>
+        ))}
+      </div>
+      <ResponsiveContainer width="100%" height={Math.max(180, data.length * 50)}>
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 16, left: 0, bottom: 4 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" horizontal={false} />
           <XAxis
@@ -223,7 +271,7 @@ function ContentBreakdown({ data }: { data: ContentBreakdownEntry[] }) {
             tick={{ fontSize: 11, fill: 'var(--color-text-secondary)' }}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(v: number) => formatNumber(v)}
+            tickFormatter={(v: number) => `${(v * 100).toFixed(1)}%`}
           />
           <YAxis
             type="category"
@@ -240,9 +288,9 @@ function ContentBreakdown({ data }: { data: ContentBreakdownEntry[] }) {
               borderRadius: 'var(--radius-md)',
               fontSize: '0.8125rem',
             }}
-            formatter={(value: number) => formatNumber(value)}
+            formatter={(value: number) => `${(value * 100).toFixed(2)}%`}
           />
-          <Bar dataKey="count" name="Posts" radius={[0, 4, 4, 0]}>
+          <Bar dataKey="avgEngagementRate" name="Avg Engagement Rate" radius={[0, 4, 4, 0]}>
             {data.map((entry) => (
               <Cell key={entry.postType} fill={getContentColor(entry.postType)} />
             ))}
@@ -253,38 +301,53 @@ function ContentBreakdown({ data }: { data: ContentBreakdownEntry[] }) {
   );
 }
 
-// ── Posting Times ──
+// ── US-303: Best Posting Times Heatmap ──
 
-function PostingTimes({ data }: { data: PostingTimeEntry[] }) {
-  const allHours = useMemo(() => {
-    const map = new Map(data.map((d) => [d.hour, d.count]));
-    return Array.from({ length: 24 }, (_, i) => ({
-      hour: i,
-      label: formatHour(i),
-      count: map.get(i) ?? 0,
-    }));
-  }, [data]);
+interface BestPostingTime {
+  dayOfWeek: number;
+  hour: number;
+  avgEngagementRate: number;
+  postCount: number;
+}
 
-  const maxCount = Math.max(...allHours.map((h) => h.count), 1);
-
-  if (data.length === 0) return null;
+function BestPostingTimes({ data }: { data: BestPostingTime[] }) {
+  if (data.length === 0) {
+    return (
+      <div className="cd-widget" data-testid="best-posting-times">
+        <h2 className="cd-widget__title">Best Posting Times</h2>
+        <p className="cd-widget__empty">Not enough data (need 2+ posts per time slot)</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="cd-widget">
-      <h2 className="cd-widget__title">Posting Times</h2>
-      <div className="cd-posting-grid">
-        {allHours.map((h) => {
-          const intensity = h.count / maxCount;
-          return (
-            <div key={h.hour} className="cd-posting-cell" title={`${h.label}: ${h.count} posts`}>
-              <div
-                className="cd-posting-bar"
-                style={{ height: `${Math.max(intensity * 100, 4)}%`, opacity: 0.3 + intensity * 0.7 }}
-              />
-              <span className="cd-posting-label">{h.label}</span>
+    <div className="cd-widget" data-testid="best-posting-times">
+      <h2 className="cd-widget__title">Best Posting Times</h2>
+      <div className="cd-widget__subtitle">Top 5 time slots by engagement rate (min 2 posts)</div>
+      <div className="cd-posting-slots">
+        {data.map((slot, idx) => (
+          <div
+            key={`${slot.dayOfWeek}-${slot.hour}`}
+            className="cd-posting-slot"
+            data-testid={`posting-slot-${idx}`}
+          >
+            <div className="cd-posting-slot__rank">#{idx + 1}</div>
+            <div className="cd-posting-slot__info">
+              <span className="cd-posting-slot__day">{DAY_NAMES[slot.dayOfWeek]}</span>
+              <span className="cd-posting-slot__hour">{formatHour(slot.hour)}</span>
             </div>
-          );
-        })}
+            <div className="cd-posting-slot__metrics">
+              <span className="cd-posting-slot__rate">{(slot.avgEngagementRate * 100).toFixed(2)}%</span>
+              <span className="cd-posting-slot__count">{slot.postCount} posts</span>
+            </div>
+            <div
+              className="cd-posting-slot__bar"
+              style={{
+                width: `${(slot.avgEngagementRate / (data[0]?.avgEngagementRate || 1)) * 100}%`,
+              }}
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -297,6 +360,63 @@ export default function ChannelDetail() {
   const navigate = useNavigate();
   const { data, error, loading, selectedRange, setSelectedRange, retry } =
     useChannelDetail(id);
+
+  const [granularity, setGranularity] = useState<Granularity>('daily');
+  const [granularTimeSeries, setGranularTimeSeries] = useState<TimeSeriesEntry[] | null>(null);
+  const [contentPerformance, setContentPerformance] = useState<ContentTypePerformance[] | null>(null);
+  const [bestTimes, setBestTimes] = useState<BestPostingTime[] | null>(null);
+  const [m3Loading, setM3Loading] = useState(false);
+
+  const dateRange = useMemo(() => {
+    if (!selectedRange) return null;
+    const end = new Date();
+    const start = new Date();
+    switch (selectedRange) {
+      case '7d': start.setDate(end.getDate() - 7); break;
+      case '30d': start.setDate(end.getDate() - 30); break;
+      case '90d': start.setDate(end.getDate() - 90); break;
+      case '6m': start.setMonth(end.getMonth() - 6); break;
+      case '1y': start.setFullYear(end.getFullYear() - 1); break;
+      default: start.setDate(end.getDate() - 30);
+    }
+    return {
+      start: start.toISOString().slice(0, 10),
+      end: end.toISOString().slice(0, 10),
+    };
+  }, [selectedRange]);
+
+  const fetchM3Data = useCallback(async () => {
+    if (!id || !dateRange) return;
+    setM3Loading(true);
+    try {
+      const [tsData, ctData, btData] = await Promise.all([
+        apiClient.getChannelTimeSeries(id, {
+          start: dateRange.start,
+          end: dateRange.end,
+          granularity,
+        }),
+        apiClient.getContentTypeBreakdown(id, {
+          start: dateRange.start,
+          end: dateRange.end,
+        }),
+        apiClient.getBestPostingTimes(id, {
+          start: dateRange.start,
+          end: dateRange.end,
+        }),
+      ]);
+      setGranularTimeSeries(tsData.timeSeries);
+      setContentPerformance(ctData.contentTypeBreakdown);
+      setBestTimes(btData.bestPostingTimes);
+    } catch (err) {
+      console.error('Failed to fetch M3 analytics:', err);
+    } finally {
+      setM3Loading(false);
+    }
+  }, [id, dateRange, granularity]);
+
+  useEffect(() => {
+    fetchM3Data();
+  }, [fetchM3Data]);
 
   if (loading) {
     return (
@@ -316,6 +436,7 @@ export default function ChannelDetail() {
           className="cd-header__back"
           onClick={() => navigate('/channels')}
           aria-label="Back to channels"
+          data-testid="back-to-channels-btn"
         >
           ← Back
         </button>
@@ -332,6 +453,7 @@ export default function ChannelDetail() {
           className="cd-header__back"
           onClick={() => navigate('/channels')}
           aria-label="Back to channels"
+          data-testid="back-to-channels-btn"
         >
           ← Back
         </button>
@@ -340,11 +462,14 @@ export default function ChannelDetail() {
     );
   }
 
-  const { channel, timeSeries, contentBreakdown, postingTimes } = data;
-  const hasData = timeSeries.length > 0 || contentBreakdown.length > 0 || postingTimes.length > 0;
+  const { channel } = data;
+  const ts = granularTimeSeries ?? data.timeSeries;
+  const cp = contentPerformance;
+  const bt = bestTimes;
+  const hasData = ts.length > 0 || (cp && cp.length > 0) || (bt && bt.length > 0);
 
   return (
-    <section className="cd-page">
+    <section className="cd-page" data-testid="channel-detail-page">
       <ChannelHeader
         platform={channel.platform as Platform}
         displayName={channel.displayName}
@@ -356,18 +481,25 @@ export default function ChannelDetail() {
 
       <div className="cd-controls">
         <DateRangeSelector selected={selectedRange} onSelect={setSelectedRange} />
+        <GranularitySelector selected={granularity} onSelect={setGranularity} />
       </div>
 
-      {!hasData ? (
+      {m3Loading ? (
+        <div className="cd-grid">
+          <WidgetSkeleton variant="chart" />
+          <WidgetSkeleton variant="chart" />
+          <WidgetSkeleton variant="table" />
+        </div>
+      ) : !hasData ? (
         <EmptyState
           title="No data for this period"
           subtitle="Try selecting a different date range."
         />
       ) : (
         <div className="cd-grid">
-          <TimeSeriesChart timeSeries={timeSeries} />
-          <ContentBreakdown data={contentBreakdown} />
-          <PostingTimes data={postingTimes} />
+          <TimeSeriesChart timeSeries={ts} granularity={granularity} />
+          {cp && <ContentTypeBreakdown data={cp} />}
+          {bt && <BestPostingTimes data={bt} />}
         </div>
       )}
     </section>

@@ -1,0 +1,187 @@
+/* ── Comparison Page Layout ── */
+
+.cmp-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-5);
+}
+
+.cmp-title {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--color-text);
+    margin: 0;
+}
+
+/* ── Channel Selector ── */
+
+.cmp-selector {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-4);
+}
+
+.cmp-selector__label {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    margin: 0 0 var(--space-3);
+    font-weight: 500;
+}
+
+.cmp-selector__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+}
+
+.cmp-selector__hint {
+    font-size: 0.75rem;
+    color: var(--color-danger, #ef4444);
+    margin: var(--space-2) 0 0;
+}
+
+.cmp-chip {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    border: 1px solid var(--color-border);
+    background-color: var(--color-surface);
+    border-radius: var(--radius-full, 999px);
+    padding: var(--space-2) var(--space-3);
+    font-size: 0.8125rem;
+    font-weight: 500;
+    font-family: var(--font-sans);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.cmp-chip:hover {
+    border-color: var(--color-primary);
+    color: var(--color-text);
+}
+
+.cmp-chip--active {
+    border-color: var(--color-primary);
+    background-color: var(--color-primary);
+    color: white;
+}
+
+.cmp-chip__platform {
+    font-size: 1rem;
+}
+
+/* ── Metrics Grid ── */
+
+.cmp-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: var(--space-4);
+}
+
+.cmp-metric-card {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-4);
+}
+
+.cmp-metric-card__label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0 var(--space-3);
+}
+
+.cmp-metric-card__values {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+}
+
+.cmp-metric-card__value {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    padding: var(--space-2);
+    border-radius: var(--radius-md);
+    transition: background-color 0.1s;
+}
+
+.cmp-metric-card__value--winner {
+    background-color: var(--color-bg);
+}
+
+.cmp-metric-card__dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+.cmp-metric-card__name {
+    font-size: 0.8125rem;
+    color: var(--color-text-secondary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cmp-metric-card__number {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--color-text);
+}
+
+.cmp-metric-card__badge {
+    font-size: 0.625rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-primary);
+    background-color: rgba(59, 130, 246, 0.1);
+    padding: 2px 6px;
+    border-radius: var(--radius-sm, 4px);
+}
+
+/* ── Chart ── */
+
+.cmp-chart {
+    background-color: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    padding: var(--space-5);
+}
+
+.cmp-chart__title {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: var(--color-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin: 0 0 var(--space-4);
+}
+
+.cmp-grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-4);
+}
+
+/* ── Responsive ── */
+
+@media (max-width: 640px) {
+    .cmp-metrics {
+        grid-template-columns: 1fr;
+    }
+}

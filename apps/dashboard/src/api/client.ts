@@ -199,6 +199,80 @@ function getChannelDetailAnalytics(
   return request<ChannelDetailAnalytics>(`/channels/${id}/analytics`, { params });
 }
 
+// ── Milestone 3: Channel Analytics Endpoints ──
+
+interface ChannelTimeSeriesData {
+  channelId: string;
+  granularity: string;
+  timeSeries: Array<{ date: string; impressions: number; engagements: number; posts: number }>;
+}
+
+interface ContentTypeBreakdownData {
+  channelId: string;
+  contentTypeBreakdown: Array<{
+    postType: string;
+    postCount: number;
+    avgImpressions: number;
+    avgEngagements: number;
+    avgEngagementRate: number;
+  }>;
+}
+
+interface BestPostingTimesData {
+  channelId: string;
+  bestPostingTimes: Array<{
+    dayOfWeek: number;
+    hour: number;
+    avgEngagementRate: number;
+    postCount: number;
+  }>;
+}
+
+interface ChannelComparisonData {
+  channels: Array<{
+    channelId: string;
+    platform: string;
+    displayName: string;
+    totalImpressions: number;
+    totalEngagements: number;
+    totalPosts: number;
+    avgEngagementRate: number;
+  }>;
+  winners: {
+    totalImpressions: string;
+    totalEngagements: string;
+    avgEngagementRate: string;
+    totalPosts: string;
+  };
+}
+
+function getChannelTimeSeries(
+  id: string,
+  params: { start: string; end: string; granularity?: string },
+): Promise<ChannelTimeSeriesData> {
+  return request<ChannelTimeSeriesData>(`/analytics/channels/${id}`, { params });
+}
+
+function getContentTypeBreakdown(
+  id: string,
+  params: { start: string; end: string },
+): Promise<ContentTypeBreakdownData> {
+  return request<ContentTypeBreakdownData>(`/analytics/channels/${id}/content-breakdown`, { params });
+}
+
+function getBestPostingTimes(
+  id: string,
+  params: { start: string; end: string },
+): Promise<BestPostingTimesData> {
+  return request<BestPostingTimesData>(`/analytics/channels/${id}/posting-times`, { params });
+}
+
+function getChannelComparison(
+  params: { channel_ids: string; start: string; end: string },
+): Promise<ChannelComparisonData> {
+  return request<ChannelComparisonData>('/analytics/compare', { params });
+}
+
 // ── Public client singleton ──
 
 export const apiClient = {
@@ -213,6 +287,10 @@ export const apiClient = {
   updateChannelSyncStatus,
   disconnectChannel,
   getChannelDetailAnalytics,
+  getChannelTimeSeries,
+  getContentTypeBreakdown,
+  getBestPostingTimes,
+  getChannelComparison,
 } as const;
 
 export function setApiAuthToken(token: string | null): void {
