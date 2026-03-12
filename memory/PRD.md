@@ -26,6 +26,11 @@ Implement Milestone 3: Per-Channel Analytics with drill-down views including 4 u
 | US-303 | Best Posting Times (top 5, min 2 posts) | DONE |
 | US-304 | Channel Comparison with winners | DONE |
 
+## Bug Fixes (March 12, 2026)
+- Fixed 403/500 error on page load caused by Node.js API process dying on container restart
+- Updated Python proxy (`server.py`) to auto-start and manage the Node.js API lifecycle via `lifespan` context manager
+- Added health-check retry loop and auto-restart on Node.js process crash
+
 ## What's Been Implemented (March 12, 2026)
 
 ### Backend (Node.js API)
